@@ -469,254 +469,203 @@ Dunkels等开发的适用于嵌入式领域的开源轻量级TCP/IP协议栈。�
 
 目前，LwIP最新更新到2.0.3版本，我们在上述网站可找到相应的LwIP源码下载通道。我们下载两个压缩包：lwip-2.0.3.zip和contrib-2.01.zip，lwip-2.0.3.zip包括了LwIP的实现代码，contrib-2.0.3.zip包含了不同平台移植LwIP的驱动代码和使用LwIP实现的一些应用实例测试。
 
-但是，遗憾的是contrib-2.0.3.zip并没有为STM32平台提供实例，这对于初学者想要移植LwIP来说难度还是非常大的。ST公司也是认识到LwIP在嵌入式领域的重要性，所以他们针对LwIP应用开发了测试平台。为减少移植工作量，我们选择使用ST官方HAL开发包《STM32Cube_FW_F7_V1.8.0》中一个例程的相关接口文件，工程路径为STM32Cube_FW_F7_V1.8.0\\Projects\\STM32756G_EVAL\\Applications\\LwIP\\LwIP_TCP_Echo_Client的，这样我们也可以花更多精力在理解代码实现方法上。
+但是，遗憾的是contrib-2.0.3.zip并没有为STM32平台提供实例，这对于初学者想要移植LwIP来说难度还是非常大的。ST公司也是认识到LwIP在嵌入式领域的重要性，所以他们针对LwIP应用开发了测试平台。为减少移植工作量，我们选择使用ST官方HAL开发包《STM32Cube_FW_H7_V1.2.0》中一个例程的相关接口文件，工程路径为STM32Cube_FW_H7_V1.2.0\\Projects\\STM32756G_EVAL\\Applications\\LwIP\\LwIP_TCP_Echo_Client的，这样我们也可以花更多精力在理解代码实现方法上。
 
 本章的一个重点内容就是介绍LwIP移植至我们的开发平台，详细的操作步骤参考下文介绍。
 
 ETH初始化结构体详解
 ~~~~~~~~~~~~~~~~~~~
 
-从STM32的ETH外设我们了解到它的功能非常多，控制涉及的寄存器也非常丰富，而使用STM32
-HAL库提供的各种结构体及库函数可以简化这些控制过程。跟其它外设一样，STM32
-HAL库提供了初始化结构体成员用于设置ETH工作环境参数，并由ETH相应初始化配置函数或功能函数调用，这些设定参数将会设置ETH相应的寄存器，达到配置ETH工作环境的目的。这些内容都定义在库文件“STM32F7xx_hal_eth.h”及“STM32F7xx\_
-hal_eth.c”中，编程时我们可以结合这两个文件内的注释使用或参考库帮助文档。
+从STM32的ETH外设我们了解到它的功能非常多，控制涉及的寄存器也非常丰富，而使用STM32 HAL库提供的各种结构体及库函数可以简化这些控制过程。跟其它外设一样，STM32 HAL库提供了初始化结构体成员用于设置ETH工作环境参数，并由ETH相应初始化配置函数或功能函数调用，这些设定参数将会设置ETH相应的寄存器，达到配置ETH工作环境的目的。这些内容都定义在库文件“stm32h7xx_hal_eth.h”及“stm32h7xx_hal_eth.c”中，编程时我们可以结合这两个文件内的注释使用或参考库帮助文档。
+
+代码清单 ETH_HandleTypeDef外设管理结构体（文件stm32h7xx_hal_eth.h）
+
+.. code-block:: c
+
+   typedef struct {
+      ETH_TypeDef                *Instance; /*!< 外设寄存器基地址*/
+      ETH_InitTypeDef            Init; /*!< 初始化结构体*/
+      ETH_TxDescListTypeDef      TxDescList; /*!< 发送数据描述符*/
+      ETH_RxDescListTypeDef      RxDescList; /*!< 接收数据描述符*/
+      HAL_LockTypeDef            Lock; /*!< 锁资源*/
+      __IO HAL_ETH_StateTypeDef  gState; /*!< ETH工作状态*/
+      __IO HAL_ETH_StateTypeDef  RxState; /*!< ETH接收状态*/
+      __IO uint32_t              ErrorCode; /*!< 错误操作返回值*/
+      __IO uint32_t              DMAErrorCode; /*!< DMA错误执行操作返回值*/
+      __IO uint32_t              MACErrorCode; /*!< MAC错误操作返回值*/
+      __IO uint32_t              MACWakeUpEvent; /*!< MAC控制器唤醒事件*/
+      __IO uint32_t              MACLPIEvent; /*!< MAC控制器低功耗空闲事件 */
+   } ETH_HandleTypeDef;
+
+(1)	Instance： 寄存器基地址指针，所有参数都是指定基地址后才能正确写入寄存器。
+
+(2)	Init：ETH初始化结构体，下面会详细讲解每一个成员。
+
+(3)	TxDescList：发送描述符，也就是发送缓冲区指针，指向当前发送数组的首地址。
+
+(4)	RxDescList：接收描述符，接收缓冲区指针针，指向当前接收数组的首地址。
+
+(5)	Lock：ETH外设锁资源。
+
+(6)	gState：ETH的工作状态值以及发送过程的状态值，可以是HAL_ETH_STATE_RESET，HAL_ETH_STATE_READY等等。
+
+(7)	RxState：ETH接收过程的状态值，其值与gState一样，也是HAL_ETH_StateTypeDef类型的枚举变量。
+
+(8)	ErrorCode：ETH错误操作返回值，用户可以根据这个参数，找到代码的错误。
+
+(9)	DMAErrorCode：DMA错误操作返回值，用户可以根据这个参数，找到代码的错误。
+
+(10)	MACErrorCode：MAC控制器错误操作返回值，用户可以根据这个参数，找到代码的错误。
+
+(11)	MACWakeUpEvent：MAC控制器的唤醒事件来源。
+
+(12)	MACLPIEvent：MAC控制器低功耗状态下的事件来源。
+
+有关ETH_HandleTypeDef外设管理结构体的成员中，我们只需要关注Instance和Init，这两个成员的变量。至于其他的变量，在调用HAL库的函数时，HAL库会根据外设的不同状态分别赋值，不需要用户关心。下面我们看一下，ETH的初始化结构体。
 
 代码清单 ETH_InitTypeDef
 
 .. code-block:: c
 
    typedef struct {
-      uint32_t             AutoNegotiation; // 自适应功能
-      uint32_t             Speed;     	// 以太网速度
-      uint32_t             DuplexMode;      // 以太网工作模式选择
-      uint16_t             PhyAddress;      // 以太网PHY地址
-      uint8_t             *MACAddr;         // MAC地址指针
-      uint32_t             RxMode;          // 以太网接收模式
-      uint32_t             ChecksumMode;    // 检查校验和模式
-      uint32_t             MediaInterface;  // 以太网介质接口
-   } ETH_InitTypeDef;
+      uint8_t                     *MACAddr; /*!< MAC地址 */
+      ETH_MediaInterfaceTypeDef   MediaInterface; /*!<选择总线类型*/
+      ETH_DMADescTypeDef          *TxDesc;  /*!< 发送DMA描述符 */
+      ETH_DMADescTypeDef          *RxDesc;  /*!< 接收DMA描述符 */
+      uint32_t                    RxBuffLen;  /*!< 接收数组长度 */
+   } ETH_InitTypeDef; 
 
--  AutoNegotiation：自适应功能选择，可选使能或禁止，一般选择使能自适应功能，系统会自动寻找最优工作方式，
-   包括选择10Mbps或者100Mbps的以太网速度以及全双工模式或半双工模式。
+1、\*MACAddr：MAC地址指针，必须是一个6个元素数组的指针。
 
--  Speed：以太网速度选择，可选10Mbps或100Mbit/s，它设定ETH_MACCR寄存器的FES位的值，
-   一般设置100Mbit/s，但在使能自适应功能之后该位设置无效。
+2、MediaInterface：以太网介质接口，可以是MII介质接口或者RMII介质接口。
 
--  DuplexMode：以太网工作模式选择，可选全双工模式或半双工模式，它设定ETH_MACCR寄存器DM位的值。
-   一般选择全双工模式，在使能了自适应功能后该成员设置无效。
+3、TxDesc：发送DMA描述符列表，指向当前发送数组的首地址。
 
--  PhyAddress：以太网PHY地址，取值范围为0~32。该字段指示正在访问 32
-   个可能的 PHY 器件中的哪一个。
+4、RxDesc：接收DMA描述符列表，指向当前接收数组的首地址。
 
--  \*MACAddr：MAC地址指针，必须是一个6个元素数组的指针。
+5、RxBuffLen：接收数组的长度。
 
--  RxMode：以太网接收接收模式，可以是轮询模式或者中断模式。
-
--  ChecksumMode：检查校验和模式，可以是硬件校验或者软件校验。
-
--  MediaInterface：以太网介质接口，可以是MII介质接口或者RMII介质接口。
-
-代码清单 ETH_MACInitTypeDef
+代码清单 ETH_MACConfigTypeDef（文件stm32h7xx_hal_eth.h）
 
 .. code-block:: c
 
    typedef struct {
-      uint32_t             Watchdog;        // 以太网看门狗
-      uint32_t             Jabber;          // jabber定时器功能
-      uint32_t             InterFrameGap;     // 发送帧间间隙
-      uint32_t             CarrierSense;      // 载波侦听
-      uint32_t             ReceiveOwn;        // 接收自身
-      uint32_t             LoopbackMode;      // 回送模式
-      uint32_t             ChecksumOffload;     // 校验和减荷
-      uint32_t             RetryTransmission;   // 传输重试
-      uint32_t             AutomaticPadCRCStrip;  // 自动去除PAD和FCS字段
-      uint32_t             BackOffLimit;      // 后退限制
-      uint32_t             DeferralCheck;     // 检查延迟
-      uint32_t             ReceiveAll;        // 接收所有MAC帧
-      uint32_t             SourceAddrFilter;    // 源地址过滤
-      uint32_t             PassControlFrames;   // 传送控制帧
-      uint32_t             BroadcastFramesReception;// 广播帧接收
-      uint32_t             DestinationAddrFilter; // 目标地址过滤
-      uint32_t             PromiscuousMode;     // 混合模式
-      uint32_t             MulticastFramesFilter; // 多播源地址过滤
-      uint32_t             UnicastFramesFilter;   // 单播源地址过滤
-      uint32_t             HashTableHigh;     // 散列表高位
-      uint32_t             HashTableLow;      // 散列表低位
-      uint32_t             PauseTime;       // 暂停时间
-      uint32_t             ZeroQuantaPause;     // 零时间片暂停
-      uint32_t             PauseLowThreshold;       // 暂停阈值下限
-      uint32_t             UnicastPauseFrameDetect; // 单播暂停帧检测
-      uint32_t             ReceiveFlowControl;    // 接收流控制
-      uint32_t             TransmitFlowControl;   // 发送流控制
-      uint32_t             VLANTagComparison;   // VLAN标记比较
-      uint32_t             VLANTagIdentifier;   // VLAN标记标识符
-   } ETH_MACInitTypeDef;
+      uint32_t         SourceAddrControl;/*!< 源地址过滤 */
+      FunctionalState  ChecksumOffload;  /*!<校验和减荷*/
+      uint32_t         InterPacketGapVal;/*!< 控制发送帧间的最小间隙*/
+      FunctionalState  GiantPacketSizeLimitControl;/*!< Giant数据包的大小限制 */
+      FunctionalState  Support2KPacket;             /*!< 支持2K大小的数据包*/
+      FunctionalState  CRCStripTypePacket;          /*!< 去除CRC字节*/
+      FunctionalState  AutomaticPadCRCStrip;/*!<自动去除PAD和FCS字段*/
+      FunctionalState  Watchdog;       /*!<以太网看门狗*/
+      FunctionalState  Jabber;         /*!< jabber定时器功能*/
+      FunctionalState  JumboPacket;    /*!< 是否接收载波值 */
+      uint32_t         Speed;            /*!< 以太网速度选择*/
+      uint32_t         DuplexMode;       /*!< 工作模式*/
+      FunctionalState  LoopbackMode;     /*!< 回送模式*/
+      FunctionalState  CarrierSenseBeforeTransmit;  /*!< 载波侦听 */
+      FunctionalState  ReceiveOwn;/*!< 接收自身*/
+      FunctionalState  CarrierSenseDuringTransmit; /*!< 传输过程中载波侦听*/
+      FunctionalState  RetryTransmission;/*!< 传输重试*/
+      uint32_t         BackOffLimit;    /*!<后退限制*/
+      FunctionalState  DeferralCheck;   /*!< 检查延迟*/
+      uint32_t         PreambleLength;  /*!< 前导码的长度*/
+      FunctionalState  UnicastSlowProtocolPacketDetect;/*!<单播模式下慢速协议检测*/
+      FunctionalState  SlowProtocolDetect;          /*!< 慢速协议检测 */
+      FunctionalState  CRCCheckingRxPackets;        /*!< 接收数据的CRC检验 */
+      uint32_t         GiantPacketSizeLimit;        /*!< Giant数据大小的阈值*/
+      FunctionalState  ExtendedInterPacketGap;      /*!< 扩展IPG选择*/
+      uint32_t         ExtendedInterPacketGapVal;   /*!< 扩展IPG*/
+      FunctionalState  ProgrammableWatchdog;        /*!< 可编程看门狗*/
+      uint32_t         WatchdogTimeout;             /*!< 超时检测*/
+      uint32_t        PauseTime;                   /*!< 暂停时间*/
+      FunctionalState  ZeroQuantaPause;             /*!< 零时间片暂停*/
+      uint32_t         PauseLowThreshold;           /*!< 暂停阈值下限 */
+      FunctionalState  TransmitFlowControl;         /*!< 发送流控制 */
+      FunctionalState  UnicastPausePacketDetect;    /*!< 单播暂停帧检测*/
+      FunctionalState  ReceiveFlowControl;          /*!< 接收流控制 */
+      uint32_t         TransmitQueueMode;           /*!< 发送队列模式*/
+      uint32_t         ReceiveQueueMode;            /*!< 接收队列模式*/
+      FunctionalState  DropTCPIPChecksumErrorPacket; /*!< 丢弃TCPIP校验和错误数据*/
+      FunctionalState  ForwardRxErrorPacket;        /*!< 转发错误帧 */
+      FunctionalState  ForwardRxUndersizedGoodPacket;  /*!< 转发过小的好帧*/
+   } ETH_MACConfigTypeDef; 
 
--  Watchdog：以太网看门狗功能选择，可选使能或禁止，它设定以太网MAC配置寄存器(ETH_MACCR)的WD位的值。如果设置为1，使能看门狗，
-   在接收MAC帧超过2048字节时自动切断后面数据，一般选择使能看门狗。如果设置为0，禁用看门狗，最长可接收16384字节的帧。
+1、	SourceAddrControl：源地址过滤，可选源地址过滤、源地址反向过滤或禁用源地址过滤，它设定ETH_MACFFR寄存器SAF位和SAIF位的值。一般选择禁用源地址过滤。
 
--  Jabber：jabber定时器功能选择，可选使能或禁止，与看门狗功能类似，只是看门狗用于接收MAC帧，jabber定时器用于发送MAC帧，
-   它设定ETH_MACCR寄存器的JD位的值。如果设置为1，使能jabber定时器，在发送MAC帧超过2048字节时自动切断后面数据，一般选择使能jabber定时器。
+2、	ChecksumOffload：IPv4校验和减荷功能选择，可选使能或禁止，它设定ETH_MACCR寄存器IPCO位的值，当该位被置1时使能接收的帧有效载荷的TCP/UDP/ICMP标头的IPv4校验和检查。一般选择禁用，此时PCE和IP HCE状态位总是为0。
 
--  InterFrameGap：控制发送帧间的最小间隙，可选96bit时间、88bit时间、…、40bit时间，
-   他设定ETH_MACCR寄存器的IFG[2:0]位的值，一般设置96bit时间。
+3、	InterPacketGapVal：控制发送帧间的最小间隙，可选96bit时间、88bit时间、…、40bit时间，他设定ETH_MACCR寄存器的IFG[2:0]位的值，一般设置96bit时间。
 
--  CarrierSense：载波侦听功能选择，可选使能或禁止，它设定ETH_MACCR寄存器的CSD位的值。
-   当被设置为低电平时，MAC发送器会生成载波侦听错误，一般使能载波侦听功能。
+4、	GiantPacketSizeLimitControl：启用或禁用巨型数据包大小限制控制。
 
--  ReceiveOwn：接收自身帧功能选择，可选使能或禁止，它设定ETH_MACCR寄存器的ROD位的值，当设置为0时，
-   MAC接收发送时PHY提供的所有MAC包，如果设置为1，MAC禁止在半双工模式下接收帧。一般使能接收。
+5、	Support2KPacket： IEEE 802.3是否支持2K大小的数据包
 
--  LoopbackMode：回送模式选择，可选使能或禁止，它设定ETH_MACCR寄存器的LM位的值，当设置为1时，使能MAC在MII回送模式下工作。
+6、	CRCStripTypePacket：自动去除数据包的CRC字段功能，可选使能或禁用。
 
--  ChecksumOffload：IPv4校验和减荷功能选择，可选使能或禁止，它设定ETH_MACCR寄存器IPCO位的值，
-   当该位被置1时使能接收的帧有效载荷的TCP/UDP/ICMP标头的IPv4校验和检查。一般选择禁用，此时PCE和IP
-   HCE状态位总是为0。
+7、	AutomaticPadCRCStrip：自动去除PAD和FCS字段功能，可选使能或禁用，它设定ETH_MACCR寄存器APCS位的值。当设置为1时，MAC在长度字段值小于或等于1500自己是去除传入帧上的PAD和FCS字段。一般禁止自动去除PAD和FCS字段功能。
 
--  RetryTransmission：传输重试功能，可选使能或禁止，它设定ETH_MACCR寄存器RD位的值，
-   当被设置为1时，MAC仅尝试发送一次，设置为0时，MAC会尝试根据BL的设置进行重试。一般选择使能重试。
+8、	Watchdog：以太网看门狗功能选择，可选使能或禁止，它设定以太网MAC配置寄存器(ETH_MACCR)的WD位的值。如果设置为1，使能看门狗，在接收MAC帧超过2048字节时自动切断后面数据，一般选择使能看门狗。如果设置为0，禁用看门狗，最长可接收16384字节的帧。
 
--  AutomaticPadCRCStrip：自动去除PAD和FCS字段功能，可选使能或禁用，它设定ETH_MACCR寄存器APCS位的值。
-   当设置为1时，MAC在长度字段值小于或等于1500自己是去除传入帧上的PAD和FCS字段。一般禁止自动去除PAD和FCS字段功能。
+9、	JumboPacket：是否接受载波值，可以选择使能或者是不使能。最多能接收9，018个字节。
 
--  BackOffLimit：后退限制，在发送冲突后重新安排发送的延迟时间，可选10、8、4、1，
-   它设定ETH_MACCR寄存器BL位的值。一般设置为10。
+10、	Speed：以太网速度选择，可选10Mbps或100Mbps，它设定ETH_MACCR的FES位的值，一般设置100Mbps。但在使能自适应功能之后该位设置无效。
 
--  DeferralCheck：检查延迟，可选使能或禁止，它设定ETH_MACCR寄存器DC位的值，
-   当设置为0时，禁止延迟检查功能，MAC发送延迟，直到CRS信号变成无效信号。
+11、	DuplexMode：以太网工作模式选择，可选全双工模式或半双工模式，它设定ETH_MACCR寄存器DM位的值。一般选择全双工模式，在使能了自适应功能后该成员设置无效。
 
--  ReceiveAll：接收所有MAC帧，可选使能或禁用，它设定以太网MAC帧过滤寄存器(ETH_MACFFR)RA位的值。
-   当设置为1时，MAC接收器将所有接收的帧传送到应用程序，不过滤地址。当设置为0是，MAC接收会自动过滤不与SA/DA匹配的帧。一般选择不接收所有。
+12、	LoopbackMode：回送模式选择，可选使能或禁止，它设定ETH_MACCR寄存器的LM位的值，当设置为1时，使能MAC在MII回送模式下工作。
 
--  SourceAddrFilter：源地址过滤，可选源地址过滤、源地址反向过滤或禁用源地址过滤，
-   它设定ETH_MACFFR寄存器SAF位和SAIF位的值。一般选择禁用源地址过滤。
+13、	CarrierSenseBeforeTransmit：载波侦听功能选择，可选使能或禁止，它设定ETH_MACCR寄存器的CSD位的值。当被设置为低电平时，MAC发送器会生成载波侦听错误，一般使能载波侦听功能。
 
--  PassControlFrames：传送控制帧，控制所有控制帧的转发，可选阻止所有控制帧到达应用程序、
-   转发所有控制帧、转发通过地址过滤的控制帧，它设定ETH_MACFFR寄存器PCF位的值。一般选择禁止转发控制帧。
+14、	ReceiveOwn：接收自身帧功能选择，可选使能或禁止，它设定ETH_MACCR寄存器的ROD位的值，当设置为0时，MAC接收发送时PHY提供的所有MAC包，如果设置为1，MAC禁止在半双工模式下接收帧。一般使能接收。
 
--  BroadcastFramesReception：广播帧接收，可选使能或禁止，它设定ETH_MACFFR寄存器BFD位的值。
-   当设置为0时，使能广播帧接收，一般设置接收广播帧。
+15、	CarrierSenseDuringTransmit：传输过程中载波侦听功能选择，可选使能或禁止，它设定ETH_MACCR寄存器的CSD位的值。当被设置为低电平时，MAC发送器会生成载波侦听错误，一般使能载波侦听功能。
 
--  DestinationAddrFilter：目标地址过滤功能选择，可选正常过滤或目标地址反向过滤，
-   它设定ETH_MACFFR寄存器DAIF位的值。一般设置为正常过滤。
+16、	RetryTransmission：传输重试功能，可选使能或禁止，它设定ETH_MACCR寄存器RD位的值，当被设置为1时，MAC仅尝试发送一次，设置为0时，MAC会尝试根据BL的设置进行重试。一般选择使能重试。
 
--  PromiscuousMode：混合模式，可选使能或禁用，它设定ETH_MACFFR寄存器PM位的值。当设置为1时，
-   不论目标或源地址，地址过滤器都传送所有传入的帧。一般禁用混合模式。
+17、	BackOffLimit：后退限制，在发送冲突后重新安排发送的延迟时间，可选10、8、4、1，它设定ETH_MACCR寄存器BL位的值。一般设置为10。
 
--  MulticastFramesFilter：多播源地址过滤，可选完美散列表过滤、散列表过滤、完美过滤或禁用过滤，
-   它设定ETH_MACFFR寄存器HPF位、PAM位和HM位的值。一般选择完美过滤。
+18、	DeferralCheck：检查延迟，可选使能或禁止，它设定ETH_MACCR寄存器DC位的值，当设置为0时，禁止延迟检查功能，MAC发送延迟，直到CRS信号变成无效信号。
 
--  UnicastFramesFilter：单播源地址过滤，可选完美散列表过滤、散列表过滤或完美过滤，
-   它设定ETH_MACFFR寄存器HPF位和HU位的值。一般选择完美过滤。
+19、	PreambleLength：选择或不选择传输数据包的前导码长度（全双工模式）。
 
--  HashTableHigh：散列表高位，和HashTableLow组成64位散列表用于组地址过滤，
-   它设定以太网MAC散列表高位寄存器(ETH_MACHTHR)的值。
+21、	UnicastSlowProtocolPacketDetect：使用单播地址启用或禁用“慢速协议数据包检测”。
 
--  HashTableLow：散列表低位，和HashTableHigh组成64位散列表用于组地址过滤，
-   它设定以太网MAC散列表低位寄存器(ETH_MACHTLR)的值。
+22、	SlowProtocolDetect：启用或禁用慢速协议检测。
 
--  PauseTime：暂停时间，保留发送控制帧中暂停时间字段要使用的值，可设置0至65535，
-   它设定以太网MAC流控制寄存器(ETH_MACFCR)PT位的值。
+23、	CRCCheckingRxPackets：启用或禁用接收数据包的CRC校验。
 
--  ZeroQuantaPause：零时间片暂停，可选使用或禁止，它设定ETH_MACFCR寄存器ZQPD位的值。
-   当设置为1时，当来自FIFO层的流控制信号去断言后，此位会禁止自动生成零时间片暂停控制帧。一般选择禁止。
+24、	GiantPacketSizeLimit：指定MAC将其声明为Giant的数据包大小，此参数的值必须是1518字节和32KB之间。
 
--  PauseLowThreshold：暂停阈值下限，配置暂停定时器的阈值，达到该值值时，会自动程序传输暂停帧，
-   可选暂停时间减去4个间隙、28个间隙、144个间隙或256个间隙，它设定ETH_MACFCR寄存器PLT位的值。一般选择暂停时间减去4个间隙。
+25、	ExtendedInterPacketGap：启用或禁用扩展的数据包间隙。
 
--  UnicastPauseFrameDetect：单播暂停帧检测，可选使能或禁止，它设定ETH_MACFCR寄存器UPFD位的值。
-   当设置为1时，MAC除了检测具有唯一多播地址的暂停帧外，还会检测具有ETH_MACA0HR和ETH_MACA0LR寄存器所指定的站单播地址的暂停帧。一般设置为禁止。
+26、	ExtendedInterPacketGapVal：在传输过程中设置数据包之间的扩展IPG，此参数可以是0x0到0xFF之间的值
 
--  ReceiveFlowControl：接收流控制，可选使能或禁止，它设定ETH_MACFCR寄存器RFCE位的值。
-   当设定为1时，MAC对接收到的暂停帧进行解码，并禁止其在指定时间（暂停时间）内发送；当设置为0时，将禁止暂停帧的解码功能，一般设置为禁止。
+27、	ProgrammableWatchdog：启用或禁用可编程看门狗。
 
--  TransmitFlowControl：发送流控制，可选使能或禁止，它设定ETH_MACFCR寄存器TFCE位的值。
-   在全双工模式下，当设置为1时，MAC将使能流控制操作来发送暂停帧；为0时，将禁止MAC中的流控制操作，MAC不会传送任何暂停帧。
-   在半双工模式下，当设置为1时，MAC将使能背压操作；为0时，将禁止背压功能。
+28、	WatchdogTimeout：指定接收数据包的监视程序超时
 
--  VLANTagComparison：VLAN标记比较，可选12位或16位，它设定以太网MAC
-   VLAN标记寄存器(ETH_MACVLANTR)VLANTC位的值。当设置为1时，使用12位VLAN标识符而不是完整的16位VLAN标记进行比较和过滤；为0时，使用全部16位进行比较，一般选择16位。
+29、	PauseTime：暂停时间，保留发送控制帧中暂停时间字段要使用的值，可设置0至65535，它设定以太网MAC流控制寄存器(ETH_MACFCR)PT位的值。
 
--  VLANTagIdentifier：VLAN标记标识符，包含用于标识VLAN帧的802.1Q
-   VLAN标记，并与正在接收的VLAN帧的第十五和第十六字节进行比较。位[15:13]是用户优先级，位[12]是标准格式指示符(CFI)，位[11:0]是VLAN标记的VLAN标识符(VID)字段。VLANTC位置1时，仅使用VID（位[11:0]）进行比较。
+30、	ZeroQuantaPause：零时间片暂停，可选使用或禁止，它设定ETH_MACFCR寄存器ZQPD位的值。当设置为1时，当来自FIFO层的流控制信号去断言后，此位会禁止自动生成零时间片暂停控制帧。一般选择禁止。
 
-代码清单 ETH\_DMAInitTypeDef
+31、	PauseLowThreshold：暂停阈值下限，配置暂停定时器的阈值，达到该值值时，会自动程序传输暂停帧，可选暂停时间减去4个间隙、28个间隙、144个间隙或256个间隙，它设定ETH_MACFCR寄存器PLT位的值。一般选择暂停时间减去4个间隙。
 
-.. code-block:: c
+32、	TransmitFlowControl：发送流控制，可选使能或禁止，它设定ETH_MACFCR寄存器TFCE位的值。在全双工模式下，当设置为1时，MAC将使能流控制操作来发送暂停帧；为0时，将禁止MAC中的流控制操作，MAC不会传送任何暂停帧。在半双工模式下，当设置为1时，MAC将使能背压操作；为0时，将禁止背压功能。
 
-   typedef struct {
-      uint32_t             DropTCPIPChecksumErrorFrame;//丢弃TCP/IP校验错误帧
-      uint32_t             ReceiveStoreForward;     // 接收存储并转发
-      uint32_t             FlushReceivedFrame;      // 刷新接收帧
-      uint32_t             TransmitStoreForward;    // 发送存储并转发
-      uint32_t             TransmitThresholdControl;  // 发送阈值控制
-      uint32_t             ForwardErrorFrames;      // 转发错误帧
-      uint32_t             ForwardUndersizedGoodFrames; // 转发过小的好帧
-      uint32_t             ReceiveThresholdControl;   // 接收阈值控制
-      uint32_t             SecondFrameOperate;      // 处理第二个帧
-      uint32_t             AddressAlignedBeats;     // 地址对齐节拍
-      uint32_t             FixedBurst;          // 固定突发
-      uint32_t             RxDMABurstLength;      // DMA突发接收长度
-      uint32_t             TxDMABurstLength;      // DMA突发发送长度
-      uint32_t             EnhancedDescriptorFormat;  // 增强描述符格式
-      uint32_t             DescriptorSkipLength;    // 描述符跳过长度
-      uint32_t             DMAArbitration;        // DMA仲裁
-   } ETH_DMAInitTypeDef;
+33、	UnicastPauseFrameDetect：单播暂停帧检测，可选使能或禁止，它设定ETH_MACFCR寄存器UPFD位的值。当设置为1时，MAC除了检测具有唯一多播地址的暂停帧外，还会检测具有ETH_MACA0HR和ETH_MACA0LR寄存器所指定的站单播地址的暂停帧。一般设置为禁止。
 
--  DropTCPIPChecksumErrorFrame：丢弃TCP/IP校验错误帧，可选使能或禁止，
-   它设定以太网DMA工作模式寄存器(ETH_DMAOMR)DTCEFD位的值，
-   当设置为1时，如果帧中仅存在由接收校验和减荷引擎检测出来的错误，则内核不会丢弃它；为0时，如果FEF为进行了复位，则会丢弃所有错误帧。
+34、	ReceiveFlowControl：接收流控制，可选使能或禁止，它设定ETH_MACFCR寄存器RFCE位的值。当设定为1时，MAC对接收到的暂停帧进行解码，并禁止其在指定时间（暂停时间）内发送；当设置为0时，将禁止暂停帧的解码功能，一般设置为禁止。
 
--  ReceiveStoreForward：接收存储并转发，可选使能或禁止，它设定以太网DMA工作模式寄存器(ETH_DMAOMR)RSF位的值，
-   当设置为1时，向RXFIFO写入完整帧后可以从中读取一帧，同时忽略接收阈值控制(RTC)位；
-   当设置为0时，RXFIFO在直通模式下工作，取决于RTC位的阈值。一般选择使能。
+35、	TransmitQueueMode：指定传输队列操作模式。
 
--  FlushReceivedFrame：刷新接收帧，可选使能或禁止，它设定ETH_DMAOMR寄存器FTF位的值，
-   当设置为1时，发送FIFO控制器逻辑会恢复到缺省值，TXFIFO中的所有数据均会丢失/刷新，刷新结束后改为自动清零。
+36、	ReceiveQueueMode：指定接收队列操作模式。
 
--  TransmitStoreForward：发送存储并并转发，可选使能或禁止，它设定ETH_DMAOMR寄存器TSF位的值，当设置为1时，如果TX
-   FIFO有一个完整的帧则发送会启动，会忽略TTC值；为0时，TTC值才会有效。一般选择使能。
+37、	DropTCPIPChecksumErrorPacket：丢弃TCP/IP校验错误帧，可选使能或禁止，它设定以太网DMA工作模式寄存器（ETH_DMAOMR）DTCEFD位的值，当设置为1时，如果帧中仅存在由接受校验和减荷引擎检测出来的错误，则内核不会丢弃它；为0时，如果FEF位复位，则会丢弃所有错误帧。
 
--  TransmitThresholdControl：发送阈值控制，有多个阈值可选，它设定ETH_DMAOMR寄存器TTC位的值，当TX
-   FIFO中帧大小大于该阈值时发送会自动，对于小于阈值的全帧也会发送。
+38、	ForwardRxErrorPacket：转发错误帧，可选使能或禁止，它设定ETH_DMAOMR寄存器FEF位的值，当设置为1时，除了段错误帧之外所有帧都会转发到 DMA；为0时，RXFIFO会丢弃所有错误状态的帧。一般选择禁止。
 
--  ForwardErrorFrames：转发错误帧，可选使能或禁止，它设定ETH_DMAOMR寄存器FEF位的值，
-   当设置为1时，除了段错误帧之外所有帧都会转发到DMA；为0时，RXFIFO会丢弃滴啊有错误状态的帧。一般选择禁止。
-
--  ForwardUndersizedGoodFrames：转发过小的好帧，可选使能或禁止，
-   它设定ETH_DMAOMR寄存器FUGF位的值，当设置为1时，RXFIFO会转发包括PAD和FCS字段的过小帧；
-   为0时，会丢弃小于64字节的帧，除非接收阈值被设置为更低。
-
--  ReceiveThresholdControl：接收阈值控制，当RX
-   FIFO中的帧大小大于阈值时启动DMA传输请求，可选64字节、32字节、96字节或128字节，它设定ETH_DMAOMR寄存器RTC位的值。
-
--  SecondFrameOperate：处理第二个帧，可选使能或禁止，它设定ETH_DMAOMR寄存器OSF位的值，
-   当设置为1时会命令DMA处理第二个发送数据帧。
-
--  AddressAlignedBeats：地址对齐节拍，可选使能或禁止，它设定以太网DMA总线模式寄存器(ETH_DMABMR)AAB位的值，
-   当设置为1并且固定突发位(FB)也为1时，AHB接口会生成与起始地址LS位对齐的所有突发；
-   如果FB位为0，则第一个突发不对齐，但后续的突发与地址对齐。一般选择使能。
-
--  FixedBurst：固定突发，控制AHB主接口是否执行固定突发传输，可选使能或禁止，它设定ETH_DMABMR寄存器FB位的值，
-   当设置为1时，AHB在正常突发传输开始期间使用SINGLE、INCR4、INCR8或INCR16；为0时，AHB使用SINGLE和INCR突发传输操作。
-
--  RxDMABurstLength：DMA突发接收长度，有多个值可选，一般选择32Beat，
-   可实现32*32bits突发长度，它设定ETH_DMABMR寄存器FPM位和RDP位的值。
-
--  TxDMABurstLength：DMA突发发送长度，有多个值可选，一般选择32Beat，
-   可实现32*32bits突发长度，它设定ETH_DMABMR寄存器FPM位和PBL位的值。
-
--  EnhancedDescriptorFormat：增强描述符格式，可以使能或者禁止。该位置 1时，
-   使能增强描述符格式，并将描述符大小增加至 32 字节（8 个DWORD）。
-   如果已激活时间戳功能（ETH_PTPTSCR 位 0 TSE=1）或 IPv4
-   校验和减荷（ETH_MACCR 位10 IPCO=1），则必须使用此增强描述符。
-
--  DescriptorSkipLength：描述符跳过长度，指定两个未链接描述符之间跳过的字数，
-   地址从当前描述符结束处开始跳到下一个描述符起始处，可选0~7，它设定ETH_DMABMR寄存器DSL位的值。
-
--  DMAArbitration：DMA仲裁，控制RX和TX优先级，可选RX
-   TX优先级比为1:1、2:1、3:1、4:1或者RX优先于TX，它设定ETH_DMABMR寄存器PM位和DA位的值，当设置为1时，RX优先于TX；为0时，循环调度，RX
-   TX优先级比由PM位给出。
+39、	ForwardRxUndersizedGoodPacket：转发过小的好帧，可选使能或禁止。它设定ETH_DMAOMR寄存器FUGF位的值，当设置为1时，RXFIFO会转发包括PAD和FCS字段的过小帧；为0时，会丢弃小于64字节的帧，除非接收阈值被设置为更低。
 
 以太网通信实验：无操作系统LwIP移植
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -741,12 +690,12 @@ PHY硬件设计
 移植步骤
 ^^^^^^^^
 
-之前已经介绍了LwIP源代码(lwip-2.0.3.zip)和ST官方LwIP测试平台资料(STM32Cube_FW_F7_V1.8.0.zip)下载，由于ST官方提供的LwIP的最新版本为2.0.0，所以我们移植步骤是基于这两份资料进行的。
+之前已经介绍了LwIP源代码(lwip-2.0.3.zip)和ST官方LwIP测试平台资料(STM32Cube_FW_H7_V1.2.0)下载，由于ST官方提供的LwIP的最新版本为2.0.0，所以我们移植步骤是基于这两份资料进行的。
 
 下面介绍无操作系统移植LwIP需要的文件。lwip-2.0.3.zip文件解压后参考图
-LwIP官方下载文件解压目录_ 。STM32Cube_FW_F7_V1.8.0.zip文件解压后在Middlewares文件夹下的目录参考
+LwIP官方下载文件解压目录_ 。STM32Cube_FW_H7_V1.2.0.zip文件解压后在Middlewares文件夹下的目录参考
 图 LwIP在CUBE开发包中作为中间件的文件目录_。
-我们将STM32Cube_FW_F7_V1.8.0\\Middlewares\\Third_Party\\LwIP\\system路径下的system文件夹拷贝到lwip-2.0.3文件夹下。
+我们将STM32Cube_FW_H7_V1.2.0\\Middlewares\\Third_Party\\LwIP\\system路径下的system文件夹拷贝到lwip-2.0.3文件夹下。
 两者结合得到我们最终需要移植的文件目录。新的lwip-2.0.3的文件目录参考
 图 LwIP最终需要移植的文件目录_。
 
@@ -771,8 +720,7 @@ LwIP 在CUBE开发包中作为中间件的文件目录
 
 LwIP最终需要移植的文件目录
 
-我们先来熟悉LwIP栈的目录组织，如图
-40‑17所示，其中，doc包含文档文件；src包含LwIP栈的源代码文件；api包含Netconn和套接字API文件；apps包含LwIP一些应用文件；core包含LwIP内核文件；include包含LwIP头文件；netif包含网络接口文件；system包含LwIP端口硬件实现文件；arch包含STM32架构端口文件（所用的数据类型）OS包含使用操作系统的LwIP端口实现文件；test包含LwIP官方的一些测试示例。
+我们先来熟悉LwIP栈的目录组织，如图 LwIP最终需要移植的文件目录_ 所示，其中，doc包含文档文件；src包含LwIP栈的源代码文件；api包含Netconn和套接字API文件；apps包含LwIP一些应用文件；core包含LwIP内核文件；include包含LwIP头文件；netif包含网络接口文件；system包含LwIP端口硬件实现文件；arch包含STM32架构端口文件（所用的数据类型）OS包含使用操作系统的LwIP端口实现文件；test包含LwIP官方的一些测试示例。
 
 接下来，我们就根据图中文件结构详解移植过程。实验例程有需要用到系统滴答定时器systick、调试串口USART、LED灯功能，对这些功能实现不做具体介绍，可以参考相关章节理解。
 
@@ -793,9 +741,9 @@ lwip-1.4.1文件夹下的doc文件夹存放LwIP版权、移植、使用等等说
 
 接下来，在BSP文件下新建一个LAN8720A文件夹，用于存放以太网PHY相关驱动文件，包括两个部分文件，LAN8720A.h和LAN8720A.c，这两个文件包含相关GPIO初始化，直接硬件相关的文件，如果硬件有更改只需要改这两个文件。
 
-在APP文件夹下，我们参考ST官方LwIP测试平台的一个例程，在如下目录STM32Cube_FW_F7_V1.8.0\\Projects\\STM32756G_EVAL\\Applications\\LwIP\\LwIP_TCP_Echo_Client中的Src文件夹和Inc文件夹中，这里我们需要用到五个文件lwipopts.h、app_ethernet.h、app_ethernet.c、ethernetif.h、ethernetif.c，因为例程使用的PHY型号不是使用LAN8720A，所以这四个文件需要我们进行修改。
+在APP文件夹下，我们参考ST官方LwIP测试平台的一个例程，在如下目录STM32Cube_FW_H7_V1.2.0\\Projects\\STM32H743I_EVAL\\Applications\\LwIP\\LwIP_TCP_Echo_Client中的Src文件夹和Inc文件夹中，这里我们需要用到五个文件lwipopts.h、app_ethernet.h、app_ethernet.c、ethernetif.h、ethernetif.c，因为例程使用的PHY型号不是使用LAN8720A，所以这四个文件需要我们进行修改。
 
-第二部：为工程添加文件
+第二步：为工程添加文件
 '''''''''''''''''''''''''
 
 第一步已经把相关的文件拷贝到对应的文件夹中，接下来就可以把需要用到的文件添加到工程中。图
@@ -979,15 +927,116 @@ HAL_ETH_MspInit函数调用ETH_GPIO_Config进行硬件初始化，并使能以�
 .. code-block:: c
 
    /**
-   * @brief  以太网硬件底层驱动
-   * @param  heth: 以太网句柄
-   * @retval None
-   */
+      * @brief  初始化ETH外设时钟，引脚.
+      * @param  heth: ETH handle
+      * @retval None
+      */
    void HAL_ETH_MspInit(ETH_HandleTypeDef *heth)
    {
       ETH_GPIO_Config();
       /* 使能以太网时钟  */
-      __HAL_RCC_ETH_CLK_ENABLE();
+      __HAL_RCC_ETH1MAC_CLK_ENABLE();
+      __HAL_RCC_ETH1TX_CLK_ENABLE();
+      __HAL_RCC_ETH1RX_CLK_ENABLE();
+   } 
+
+代码清单 LAN8720_Init函数（文件LAN8720a.c）
+
+.. code-block:: c
+
+   /**
+      * @brief  初始化LAN8720A.
+      * @param  heth: ETH handle
+      * @retval HAL_StatusTypeDef：状态值
+      */
+   HAL_StatusTypeDef LAN8720_Init(ETH_HandleTypeDef *heth)
+   {
+      uint32_t phyreg = 0;
+      uint32_t TIME_Out = 0;
+      //软件复位LAN8720A
+      if (HAL_ETH_WritePHYRegister(heth, LAN8720A_PHY_ADDRESS, PHY_BCR, PHY_RESET) != HAL_OK) {
+            return HAL_ERROR;
+      }
+      //等待LAN8720A复位完成
+      HAL_Delay(PHY_RESET_DELAY);
+   
+      if ((HAL_ETH_WritePHYRegister(heth, LAN8720A_PHY_ADDRESS, PHY_BCR, PHY_AUTONEGOTIATION)) != 
+         HAL_OK) {
+            return HAL_ERROR;
+      }
+      //等待LAN8720A写入完成
+      HAL_Delay(0xFFF);
+      do {
+            HAL_ETH_ReadPHYRegister(heth, LAN8720A_PHY_ADDRESS, PHY_BSR, &phyreg);
+            TIME_Out++;
+            if (TIME_Out > PHY_READ_TO)
+               return HAL_TIMEOUT;
+      } while (((phyreg & PHY_AUTONEGO_COMPLETE) != PHY_AUTONEGO_COMPLETE));
+   
+      return HAL_OK;
+   }
+
+LAN8720_Init函数主要用于配置LAN8720A的寄存器。首先，向BCR寄存器的写入PHY_RESET值，调用HAL_Delay函数等待软件复位LAN8720A完成。接着想BCR寄存器写入PHY_AUTONEGOTIATION，设置为PHY芯片的自适应功能，调用HAL_Delay函数等待LAN8720A写入完成。最后，读取LAN8720A的BSR寄存器来确定器件器件是否正常工作，并将初始化器件的状态值返回。
+
+ETH外设有专门实现数据搬运的DMA，可以在CPU完全不干预的情况下，用DMA描述符有效地将数据从源地址传送到目标地址。STM32H743通过以下两个数据结构来实现通信：一个是控制和状态寄存器（CSR），另一个是DMA描述符列表和数据缓冲区。所谓的描述符列表就是单片机的某一块内存单元，每一个描述符列表最多可以指向两个缓冲区。调用MPU_Config函数来保护这部分的内存单元，以及区域内的DCache的读写方式。
+
+代码清单 DMA描述符定义（文件ethernetif.c）以及MPU外设配置（文件main.c）
+
+.. code-block:: c
+
+   //以太网Rx DMA描述符
+   __attribute__((at(0x30040000))) ETH_DMADescTypeDef  DMARxDscrTab[ETH_RX_DESC_CNT];
+   //以太网Tx DMA描述符
+   __attribute__((at(0x30040060))) ETH_DMADescTypeDef  DMATxDscrTab[ETH_TX_DESC_CNT];
+   //以太网接收缓冲区
+   __attribute__((at(0x30040200))) uint8_t Rx_Buff[ETH_RX_DESC_CNT][ETH_MAX_PACKET_SIZE];
+   
+   /**
+      * @brief  配置MPU外设
+      * @param  None
+      * @retval None
+      */
+   static void MPU_Config(void)
+   {
+      MPU_Region_InitTypeDef MPU_InitStruct;
+   
+      /* Disable the MPU */
+      HAL_MPU_Disable();
+   
+      /* Configure the MPU attributes as Device not cacheable
+         for ETH DMA descriptors */
+      MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+      MPU_InitStruct.BaseAddress = 0x30040000;
+      MPU_InitStruct.Size = MPU_REGION_SIZE_256B;
+      MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+      MPU_InitStruct.IsBufferable = MPU_ACCESS_BUFFERABLE;
+      MPU_InitStruct.IsCacheable = MPU_ACCESS_NOT_CACHEABLE;
+      MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+      MPU_InitStruct.Number = MPU_REGION_NUMBER0;
+      MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
+      MPU_InitStruct.SubRegionDisable = 0x00;
+      MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
+   
+      HAL_MPU_ConfigRegion(&MPU_InitStruct);
+   
+      /* Configure the MPU attributes as Cacheable write through
+         for LwIP RAM heap which contains the Tx buffers */
+      MPU_InitStruct.Enable = MPU_REGION_ENABLE;
+      MPU_InitStruct.BaseAddress = 0x30044000;
+      MPU_InitStruct.Size = MPU_REGION_SIZE_16KB;
+      MPU_InitStruct.AccessPermission = MPU_REGION_FULL_ACCESS;
+      MPU_InitStruct.IsBufferable = MPU_ACCESS_NOT_BUFFERABLE;
+      MPU_InitStruct.IsCacheable = MPU_ACCESS_CACHEABLE;
+      MPU_InitStruct.IsShareable = MPU_ACCESS_NOT_SHAREABLE;
+      MPU_InitStruct.Number = MPU_REGION_NUMBER1;
+      MPU_InitStruct.TypeExtField = MPU_TEX_LEVEL0;
+      MPU_InitStruct.SubRegionDisable = 0x00;
+      MPU_InitStruct.DisableExec = MPU_INSTRUCTION_ACCESS_ENABLE;
+   
+      HAL_MPU_ConfigRegion(&MPU_InitStruct);
+   
+      /* Enable the MPU */
+      HAL_MPU_Enable(MPU_PRIVILEGED_DEFAULT);
    }
 
 low_level_init主要是初始化硬件外设，最终被 ethernetif_init函数调用。
@@ -1301,86 +1350,6 @@ ethernetif_input函数用于从以太网存储器读取一个以太网帧并将�
 
 sys_check_timeouts函数是一个必须被无限循环调用的LwIP支持函数，一般在main函数的无限循环中调用，使用sys_now()函数，当超时到期时调用超时处理函数。
 
-代码清单 LwIP_DHCP_Process_Handle函数
-
-.. code-block:: c
-   :name: LwIP_DHCP_Process_Handle函数
-
-   void LwIP_DHCP_Process_Handle(void)
-   {
-      struct ip_addr ipaddr;
-      struct ip_addr netmask;
-      struct ip_addr gw;
-
-      switch (DHCP_state) {
-      case DHCP_START: {
-         DHCP_state = DHCP_WAIT_ADDRESS;
-         dhcp_start(&gnetif);
-         /* IP address should be set to 0
-            every time we want to assign a new DHCP address */
-         IPaddress = 0;
-   #ifdef SERIAL_DEBUG
-         printf("\n     Looking for    \n");
-         printf("     DHCP server    \n");
-         printf("     please wait... \n");
-   #endif /* SERIAL_DEBUG */
-      }
-      break;
-
-      case DHCP_WAIT_ADDRESS: {
-         /* Read the new IP address */
-         IPaddress = gnetif.ip_addr.addr;
-
-         if (IPaddress!=0) {
-               DHCP_state = DHCP_ADDRESS_ASSIGNED;
-               /* Stop DHCP */
-               dhcp_stop(&gnetif);
-   #ifdef SERIAL_DEBUG
-               printf("\n  IP address assigned \n");
-               printf("    by a DHCP server   \n");
-               printf("IP: %d.%d.%d.%d\n",(uint8_t)(IPaddress),
-                              (uint8_t)(IPaddress >> 8),(uint8_t)(IPaddress >> 16),
-                              (uint8_t)(IPaddress >> 24));
-               printf("NETMASK: %d.%d.%d.%d\n",NETMASK_ADDR0,NETMASK_ADDR1,
-                                    NETMASK_ADDR2,NETMASK_ADDR3);
-               printf("Gateway: %d.%d.%d.%d\n",GW_ADDR0,GW_ADDR1,
-                                                GW_ADDR2,GW_ADDR3);
-               LED1_ON;
-   #endif /* SERIAL_DEBUG */
-         } else {
-               /* DHCP timeout */
-               if (gnetif.dhcp->tries > MAX_DHCP_TRIES) {
-                  DHCP_state = DHCP_TIMEOUT;
-                  /* Stop DHCP */
-                  dhcp_stop(&gnetif);
-                  /* Static address used */
-               IP4_ADDR(&ipaddr, IP_ADDR0 ,IP_ADDR1 , IP_ADDR2 , IP_ADDR3 );
-                  IP4_ADDR(&netmask, NETMASK_ADDR0, NETMASK_ADDR1,
-                                          NETMASK_ADDR2, NETMASK_ADDR3);
-                  IP4_ADDR(&gw, GW_ADDR0, GW_ADDR1, GW_ADDR2, GW_ADDR3);
-                  netif_set_addr(&gnetif, &ipaddr , &netmask, &gw);
-   #ifdef SERIAL_DEBUG
-                  printf("\n    DHCP timeout    \n");
-                  printf("  Static IP address   \n");
-                  printf("IP: %d.%d.%d.%d\n",IP_ADDR0,IP_ADDR1,
-                                                   IP_ADDR2,IP_ADDR3);
-      printf("NETMASK: %d.%d.%d.%d\n",NETMASK_ADDR0,NETMASK_ADDR1,
-                                       NETMASK_ADDR2,NETMASK_ADDR3);
-                  printf("Gateway: %d.%d.%d.%d\n",GW_ADDR0,GW_ADDR1,
-                                                         GW_ADDR2,GW_ADDR3);
-                  LED1_ON;
-   #endif /* SERIAL_DEBUG */
-               }
-         }
-      }
-      break;
-      default:
-         break;
-      }
-   }
-
-LwIP_DHCP_Process_Handle函数用于执行DHCP功能，当DHCP状态为DHCP_START时，执行dhcp_start函数启动DHCP功能，LwIP会向DHCP服务器申请分配IP请求，并进入等待分配状态。当DHCP状态为DHCP_WAIT_ADDRESS时，先判断IP地址是否为0，如果不为0说明已经有IP地址，DHCP功能已经完成可以停止它；如果IP地址总是为0，就需要判断是否超过最大等待时间，并提示出错。
-
 lwipopts.h文件存放一些宏定义，用于剪切LwIP功能，比如有无操作系统、内存空间分配、存储池分配、TCP功能、DHCP功能、UDP功能选择等等。这里使用与ST官方例程相同配置即可。
 
 代码清单 main函数
@@ -1388,49 +1357,53 @@ lwipopts.h文件存放一些宏定义，用于剪切LwIP功能，比如有无操
 .. code-block:: c
 
    /**
-   * @brief  主函数
-   * @param  无
-   * @retval 无
-   */
+      * @brief  主函数
+      * @param  无
+      * @retval 无
+      */
    int main(void)
    {
-      /* 使能指令缓存 */
+      /* 配置相应的内存单元为ETH的DMA描述符列表 */
+      MPU_Config();
+   
+      /* Enable I-Cache */
       SCB_EnableICache();
-
-      /* 使能数据缓存*/
+   
+      /* Enable D-Cache */
       SCB_EnableDCache();
-
-      /* 配置系统时钟为216 MHz */
+      //将Cache设置write-through方式
+      SCB->CACR|=1<<2;
+   
+      /* 配置系统时钟为400 MHz */
       SystemClock_Config();
-
+   
       /* 初始化RGB彩灯 */
       LED_GPIO_Config();
-
+   
       /* 初始化USART1 配置模式为 115200 8-N-1 */
-      UARTx_Config();
-
+      DEBUG_USART_Config();
+   
       /* 初始化LwIP协议栈*/
       lwip_init();
-
+   
       printf("LAN8720A Ethernet Demo\n");
       printf("LwIP版本：%s\n",LWIP_VERSION_STRING);
-
+   
       printf("ping实验例程\n");
-
+   
       printf("使用同一个局域网中的电脑ping开发板的地址，可进行测试\n");
-
+   
       //IP地址和端口可在main.h文件修改
       printf("本地IP和端口: %d.%d.%d.%d\n",IP_ADDR0,IP_ADDR1,IP_ADDR2,IP_ADDR3);
       /* 网络接口配置 */
       Netif_Config();
-      /* 报告用户网络连接状态 */
+   
       User_notification(&gnetif);
-
       while (1) {
-         /* 从以太网缓冲区中读取数据包，交给LwIP 处理 */
-         ethernetif_input(&gnetif);
-         /* 处理 LwIP 超时 */
-         sys_check_timeouts();
+            /* 从以太网缓冲区中读取数据包，交给LwIP处理 */
+            ethernetif_input(&gnetif);
+            /* 处理 LwIP 超时 */
+            sys_check_timeouts();
       }
    }
 

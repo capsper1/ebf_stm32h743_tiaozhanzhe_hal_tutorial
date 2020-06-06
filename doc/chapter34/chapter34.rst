@@ -1,9 +1,9 @@
 WWDG—窗口看门狗
 ---------------
 
-本章参考资料：《STM32F7xx中文参考手册》WWDG章节。
+本章参考资料：《STM32H743用户手册》WWDG章节、《STM32H743xI规格书》、库帮助文档《STM32H753xx_User_Manual.chm》。
 
-学习本章时，配合《STM32F7xx中文参考手册》WWDG章节一起阅读，效果会更佳，特别是涉及到寄存器说明的部分。
+学习本章时，配合《STM32H743用户手册》WWDG章节一起阅读，效果会更佳，特别是涉及到寄存器说明的部分。
 
 WWDG简介
 ~~~~~~~~
@@ -164,7 +164,7 @@ WWDG配置函数有三个形参，tr是计数器的值，一般我们设置成�
     *     @arg WWDG_PRESCALER_8: WWDG counter clock = (PCLK1/4096)/8
     */
 
-这些宏在stm32f7xx_hal_wwdg.h中定义，宏展开是32位的16进制数，具体作用是设置配置寄存器CFR的位8:7
+这些宏在stm32h7xx_hal_iwdg.h中定义，宏展开是32位的16进制数，具体作用是设置配置寄存器CFR的位8:7
 WDGTB[1:0]，获得各种分频系数。
 
 WWDG中断优先级函数
@@ -232,7 +232,7 @@ WWDG中断优先级函数
     int main(void)
     {
         uint8_t wwdg_tr, wwdg_wr;
-        /* 系统时钟初始化成216 MHz */
+        /* 系统时钟初始化成400 MHz */
         SystemClock_Config();
         /* LED 端口初始化 */
         LED_GPIO_Config();

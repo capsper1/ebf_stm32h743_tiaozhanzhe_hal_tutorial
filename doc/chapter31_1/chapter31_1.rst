@@ -1,28 +1,20 @@
 LPTIM—低功耗定时器
 ------------------
 
-本章参考资料：《STM32H74xxx参考手册》、《STM32F7xx规格书》、库帮助文档《STM32F779xx_User_Manual.chm》。
+本章参考资料：《STM32H743用户手册》、《STM32H743xI规格书》、库帮助文档《STM32H753xx_User_Manual.chm》
 
-学习本章时，配合《STM32H74xxx参考手册》低功耗定时器章节一起阅读，效果会更佳，特别是涉及到寄存器说明的部分。
+学习本章时，配合《STM32H743用户手册》低功耗定时器章节一起阅读，效果会更佳，特别是涉及到寄存器说明的部分。
 
-特别说明，本书内容是以STM32H74xx系列控制器资源讲解。
+特别说明，本书内容是以STM32H743系列控制器资源讲解。
 
 低功耗定时器
 ~~~~~~~~~~~~
 
-LPTIM 是一个 16
-位定时器，顾名思义他就是可以实现低功耗应用的一个特殊定时器。由于时钟源的多样性，LPTIM
-能够在除待机模式以外的所有电源模式下保持运行。即使没有内部时钟源， LPTIM
-也能运行，鉴于这一点，可将其用作“脉冲计数器”，这种脉冲计数器在某些应用中十分有用。此外，
-LPTIM
-还能将系统从低功耗模式唤醒，因此非常适合实现“超时功能”，而且功耗极低。
+LPTIM 是一个 16 位定时器，顾名思义他就是可以实现低功耗应用的一个特殊定时器。由于时钟源的多样性，LPTIM 能够在除待机模式以外的所有电源模式下保持运行。即使没有内部时钟源， LPTIM 也能运行，鉴于这一点，可将其用作“脉冲计数器”，这种脉冲计数器在某些应用中十分有用。此外， LPTIM 还能将系统从低功耗模式唤醒，因此非常适合实现“超时功能”，而且功耗极低。
 
-LPTIM
-引入了一个灵活的时钟方案，该方案能够提供所需的功能和性能，同时还能最大程度地降低功耗。
+LPTIM 引入了一个灵活的时钟方案，该方案能够提供所需的功能和性能，同时还能最大程度地降低功耗。
 
-LPTIM时基单元包含一个16位自动重载计数器ARR，一个16位的递增计数器CNT，一个3位可编程预分频器可以采用8种分频系数（1、2、4、8、16、32、64、128），预分频器时钟源有多种可选，有内部时钟源：
-LSE、 LSI、 HSI 或 APB 时钟、外部时钟ULPTIM 输入的外部时钟源（在没有 LP
-振荡器运行的情况下工作，由脉冲计数器应用使用）。
+LPTIM时基单元包含一个16位自动重载计数器ARR，一个16位的递增计数器CNT，一个3位可编程预分频器可以采用8种分频系数（1、2、4、8、16、32、64、128），预分频器时钟源有多种可选，有内部时钟源： LSE、 LSI、 HSI 或 APB 时钟、外部时钟ULPTIM 输入的外部时钟源（在没有 LP 振荡器运行的情况下工作，由脉冲计数器应用使用）。
 
 低功耗定时器功能框图
 ~~~~~~~~~~~~~~~~~~~~
@@ -41,7 +33,7 @@ LSE、 LSI、 HSI 或 APB 时钟、外部时钟ULPTIM 输入的外部时钟源�
 
 低功耗定时器有多个时钟源可选：
 
--  内部时钟源APB时钟，PCLK1=45MHz(默认)
+-  内部时钟源APB时钟，PCLK1=100MHz(默认)
 
 -  内部时钟LSE
 
@@ -280,16 +272,14 @@ LPTIM 必须由内部时钟源提供时钟，因此 CKSEL 位必须保持其复�
 定时器初始化结构体详解
 ~~~~~~~~~~~~~~~~~~~~~~
 
-HAL库函数对定时器外设建立了多个初始化结构体，分别为时基初始化结构体TIM_Base_InitTypeDef、输出比较初始化结构体TIM_OC_InitTypeDef、输入捕获初始化结构体TIM_IC_InitTypeDef、单脉冲初始化结构体TIM_OnePulse_InitTypeDef、编码器模式配置初始化结构体TIM_Encoder_InitTypeDef、断路和死区初始化结构体TIM_BreakDeadTimeConfigTypeDef，高级控制定时器可以用到所有初始化结构体，通用定时器不能使用TIM_BreakDeadTimeConfigTypeDef结构体，基本定时器只能使用时基结构体。初始化结构体成员用于设置定时器工作环境参数，并由定时器相应初始化配置函数调用，最终这些参数将会写入到定时器相应的寄存器中。
-
-初始化结构体和初始化库函数配合使用是HAL库精髓所在，理解了初始化结构体每个成员意义基本上就可以对该外设运用自如。初始化结构体定义在stm32f7xx_hal_tim.h和stm32f7xx_hal_tim_ex.h文件中，初始化库函数定义在stm32f7xx_hal_tim.c和stm32f7xx_hal_tim_ex.c文件中，编程时我们可以结合这四个文件内注释使用。
+初始化结构体和初始化库函数配合使用是HAL库精髓所在，理解了初始化结构体每个成员意义基本上就可以对该外设运用自如。初始化结构体定义在stm32h7xx_hal_lptim.h中，初始化库函数定义在stm32h7xx_hal_lptim.c c文件中，编程时我们可以结合这两个文件内注释使用。
 
 LPTIM_HandleTypeDef
 '''''''''''''''''''
 
 时基结构体LPTIM_HandleTypeDef用于定时器基础参数设置，与HAL_LPTIM_Init函数配合使用完成配置。
 
-代码清单  低功耗定时器基本初始化结构体
+代码清单  低功耗定时器基本初始化结构体（stm32h7xx_hal_lptim.h文件）
 
 .. code-block:: c
    :name: 代码清单 低功耗定时器基本初始化结构体
@@ -320,29 +310,34 @@ LPTIM_InitTypeDef
 代码清单 定时器基本初始化结构体
 
 .. code-block:: c
-   :name: 代码清单 定时器基本初始化结构体
+   :name: 代码清单 定时器基本初始化结构体（stm32h7xx_hal_lptim.h文件）
 
     typedef struct {
-    LPTIM_ClockConfigTypeDef     Clock;               /*配置时钟参数*/
-    LPTIM_ULPClockConfigTypeDef  UltraLowPowerClock;  /*配置超低功耗时钟参数 */
-    LPTIM_TriggerConfigTypeDef   Trigger;             /*配置定时器触发参数 */
-    uint32_t      OutputPolarity;      /*配置输出极性 */
-    uint32_t      UpdateMode;          /*配置定时器更新模式*/
-    uint32_t      CounterSource;       /*配置计数器基于内部或者外部事件触发递增*/
-    } LPTIM_InitTypeDef;
+        LPTIM_ClockConfigTypeDef     Clock;  /*!< 配置时钟参数 */
+        LPTIM_ULPClockConfigTypeDef UltraLowPowerClock;/*!<配置超低功耗时钟参数 */
+        LPTIM_TriggerConfigTypeDef   Trigger;/*!< 配置定时器触发参数 */
+        uint32_t      OutputPolarity;/*!< 配置输出极性 */
+        uint32_t      UpdateMode;/*!< 配置定时器更新模式 */
+        uint32_t      CounterSource;/*!< 配置计数器基于内部或者外部事件触发递增 */
+        uint32_t      Input1Source;/*!< 选择外部输入1的时钟来源*/
+        uint32_t      Input2Source;/*!< 选择外部输入2的时钟来源 */
+    } LPTIM_InitTypeDef; 
 
-(1) Clock：定时器时钟参数的设置，通过clock结构体配置时钟输入源及分频系数。
+(1)	Clock：定时器时钟参数的设置，通过clock结构体配置时钟输入源及分频系数。
 
-(2) UltraLowPowerClock：定时器超低功耗时钟参数的设置，
-    选择超低功耗时钟源之后改组设置才生效。可设置时钟极性和时钟的采样时间。
+(2)	UltraLowPowerClock：定时器超低功耗时钟参数的设置， 选择超低功耗时钟源之后改组设置才生效。可设置时钟极性和时钟的采样时间。
 
-(3) Trigger：配置定时器触发参数，配置触发源、触发有效边沿、触发采样时间。
+(3)	Trigger：配置定时器触发参数，配置触发源、触发有效边沿、触发采样时间。
 
-(4) OutputPolarity：配置输出极性。
+(4)	OutputPolarity：配置输出极性。
 
-(5) UpdateMode：配置定时器的更新模式。
+(5)	UpdateMode：配置定时器的更新模式。
 
-(6) CounterSource：配置计数器基于内部或者外部事件触发递增。
+(6)	CounterSource：配置计数器基于内部或者外部事件触发递增。
+
+(7)	Input1Source：选择外部输入1的时钟来源，用于提供LPTIM时钟。
+
+(8)	Input1Source：选择外部输入2的时钟来源，只适用于LPTIM1和LPTIM2的编码器模式。
 
 PWM输出实验
 ~~~~~~~~~~~
@@ -384,12 +379,21 @@ PWM输出实验
 .. code-block:: c
    :name: 代码清单 宏定义
 
+    #define LSE                               1
+    #define LSI                               2
+    //选择内部时钟的来源
+    #define LPTIMx_CLK_Source                 LSI
+
     //引脚定义
     /*******************************************************/
-    #define LPTIM1_OUT_PIN                  GPIO_PIN_13
-    #define LPTIM1_OUT_GPIO_PORT            GPIOD
-    #define LPTIM1_OUT_GPIO_CLK_ENABLE()    __GPIOD_CLK_ENABLE()
-    #define LPTIM1_OUT_AF                   GPIO_AF3_LPTIM1
+    #define LPTIMx_CLK_ENABLE()               __LPTIM1_CLK_ENABLE()
+    #define LPTIMx_Instance                   LPTIM1
+
+
+    #define LPTIMx_OUT_GPIO_CLK_ENABLE()      __GPIOD_CLK_ENABLE()
+    #define LPTIMx_OUT_GPIO_PORT              GPIOD
+    #define LPTIMx_OUT_PIN                    GPIO_PIN_13
+    #define LPTIMx_OUT_AF                     GPIO_AF1_LPTIM1
 
 使用宏定义非常方便程序升级、移植。如果使用不同的定时器IO，修改这些宏即可。
 
@@ -401,21 +405,21 @@ PWM输出实验
 .. code-block:: c
    :name: 代码清单 定时器复用功能引脚初始化
 
-    static void LPTIM_GPIO_Config(void)
+    void LPTIM_GPIO_Config(void)
     {
-        /*定义一个GPIO_InitTypeDef类型的结构体*/
         GPIO_InitTypeDef GPIO_InitStructure;
-
-        /*开启定时器相关的GPIO外设时钟*/
-        LPTIM1_OUT_GPIO_CLK_ENABLE();
-
-        /* 定时器功能引脚初始化 */
-        GPIO_InitStructure.Pin = LPTIM1_OUT_PIN;
+        /*开启LPTIM1引脚的时钟*/
+        LPTIMx_OUT_GPIO_CLK_ENABLE();
+        /*选择按键的引脚*/
+        GPIO_InitStructure.Pin = LPTIMx_OUT_PIN;
+        /*设置引脚为复用推捖模式*/
         GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
+        /*设置引脚不上拉也不下拉*/
         GPIO_InitStructure.Pull = GPIO_PULLUP;
-        GPIO_InitStructure.Speed = GPIO_SPEED_LOW;
-        GPIO_InitStructure.Alternate = LPTIM1_OUT_AF;
-        HAL_GPIO_Init(LPTIM1_OUT_GPIO_PORT, &GPIO_InitStructure);
+        GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_HIGH;
+        GPIO_InitStructure.Alternate = LPTIMx_OUT_AF;
+        /*使用上面的结构体初始化按键*/
+        HAL_GPIO_Init(LPTIMx_OUT_GPIO_PORT, &GPIO_InitStructure);
     }
 
 定时器通道引脚使用之前必须设定相关参数，这选择复用功能，并指定到对应的定时器。使用GPIO之前都必须开启相应端口时钟。
@@ -426,39 +430,45 @@ PWM输出实验
 代码清单 定时器模式配置
 
 .. code-block:: c
-   :name: 代码清单 定时器模式配置
+   :name: 代码清单 定时器模式配置（bsp_lptim.c文件）
 
-    static void LPTIM_Mode_Config(void)
+    void LPTIM_MODE_Config(void)
     {
-        RCC_PeriphCLKInitTypeDef        RCC_PeriphCLKInitStruct;
+    
+        RCC_PeriphCLKInitTypeDef RCC_PeriphCLKInitStruct;
         uint32_t PeriodValue;
         uint32_t PulseValue;
-
-        /* 选择LSE时钟作为LPTIM时钟源 */
         RCC_PeriphCLKInitStruct.PeriphClockSelection = RCC_PERIPHCLK_LPTIM1;
+        /* 选择LSI时钟作为LPTIM时钟源 */
+    #if (LPTIMx_CLK_Source == LSI)
+        RCC_PeriphCLKInitStruct.Lptim1ClockSelection = RCC_LPTIM1CLKSOURCE_LSI;
+        /* 选择LSE时钟作为LPTIM时钟源 */
+    #elif (LPTIMx_CLK_Source == LSE)
         RCC_PeriphCLKInitStruct.Lptim1ClockSelection = RCC_LPTIM1CLKSOURCE_LSE;
+    #endif
         HAL_RCCEx_PeriphCLKConfig(&RCC_PeriphCLKInitStruct);
-        // 开启LPTIM1时钟
-        __LPTIM1_CLK_ENABLE();
+        /*开启LPTIM1的时钟*/
+    
+        LPTIMx_CLK_ENABLE();
         /* 定义定时器的句柄即确定定时器寄存器的基地址*/
-        LPTIM_Handle.Instance = LPTIM1;
-        // 高级控制定时器时钟源LPTIM_CLK = LSE=32.768KHz
-        LPTIM_Handle.Init.Clock.Source    = LPTIM_CLOCKSOURCE_APBCLOCK_LPOSC;
+        LPTIM_Handle.Instance = LPTIMx_Instance;
+        //选择内部时钟源LPTIM_CLK = LSE=32.768KHz
+        LPTIM_Handle.Init.Clock.Source = LPTIM_CLOCKSOURCE_APBCLOCK_LPOSC;
         // 定时器时钟分频系数
         LPTIM_Handle.Init.Clock.Prescaler = LPTIM_PRESCALER_DIV1;
         // 定时器计数源，内部
-        LPTIM_Handle.Init.CounterSource   = LPTIM_COUNTERSOURCE_INTERNAL;
+        LPTIM_Handle.Init.CounterSource = LPTIM_COUNTERSOURCE_INTERNAL;
         // 触发源，软件触发
         LPTIM_Handle.Init.Trigger.Source  = LPTIM_TRIGSOURCE_SOFTWARE;
         // 定时器输出极性
         LPTIM_Handle.Init.OutputPolarity  = LPTIM_OUTPUTPOLARITY_HIGH;
         // 定时器更新方式
         LPTIM_Handle.Init.UpdateMode      = LPTIM_UPDATE_IMMEDIATE;
-        // 初始化定时器LPTIM
+    
         HAL_LPTIM_Init(&LPTIM_Handle);
-
         /*PWM模式配置*/
-        /*当定时器从0计数到99，即为100次，为一个定时周期PWM周期，32.768KHz/100 = 327.68Hz*/
+        /*当定时器从0计数到99，即为100次，
+        为一个定时周期PWM周期，32.768KHz/100=327.68Hz*/
         PeriodValue = 100-1;
         /*PWM脉冲为周期一半即50% */
         PulseValue = 50-1;
@@ -467,9 +477,9 @@ PWM输出实验
 
 首先定义低功耗定时器初始化结构体，定时器模式配置函数主要就是对这两个个结构体的成员进行初始化，然后通过相应的初始化函数把这些参数写入定时器的寄存器中。有关结构体的成员介绍请参考低功耗定时器初始化结构体详解小节。
 
-不同的定时器可能对应不同的时钟源，在使能定时器时钟是必须特别注意。低功耗定时器我们选择LSE作为时钟源，即32.768KHz。
+不同的定时器可能对应不同的时钟源，在使能定时器时钟是必须特别注意。低功耗定时器我们选择LSI作为时钟源，即32KHz。
 
-输出PWM我们只需确定两个参数，PeriodValue为波形周期，这里设置为100，周期为32.768KHz/100=327.68Hz，PulseValue为周期的一半，即占空比为50%，最后使用库函数HAL_LPTIM_PWM_Start直接产生波形。
+输出PWM我们只需确定两个参数，PeriodValue为波形周期，这里设置为100，周期为32 KHz/100=32Hz，PulseValue为周期的一半，即占空比为50%，最后使用库函数HAL_LPTIM_PWM_Start直接产生波形。
 
 低功耗模式输出波形，按键唤醒退出
 ====================================
@@ -502,14 +512,18 @@ PWM输出实验
 
     int main(void)
     {
-        /* 初始化系统时钟为216MHz */
+
+        /* 系统时钟初始化成400MHz */
         SystemClock_Config();
         /* 初始化低速时钟为32.768KHz */
-        LSE_ClockEnable();
+        LPTIM_ClockEnable();
         /* 初始化按键GPIO */
         Key_GPIO_Config();
         /* 低功耗定时器在低功耗模式输出PWM */
         LPTIM_PWM_OUT();
+        while (1) {
+
+        }
     }
 
 首先，调用初始化系统时钟和低速时钟，Key_GPIO_Config函数完成按键引脚初始化配置，该函数定义在bsp_key.c文件中，其中KEY2配置为上升沿中断模式。

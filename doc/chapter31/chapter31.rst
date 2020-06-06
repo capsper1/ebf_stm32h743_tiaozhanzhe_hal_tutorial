@@ -1,14 +1,13 @@
 TIM—高级定时器
 --------------
 
-本章参考资料：《STM32H74xxx参考手册》、《STM32F7xx规格书》、库帮助文档《STM32F779xx_User_Manual.chm》。
+本章参考资料：《STM32H743用户手册》、《STM32H743xI规格书》、库帮助文档《STM32H753xx_User_Manual.chm》。
 
-学习本章时，配合《STM32H74xxx参考手册》高级定时器章节一起阅读，效果会更佳，特别是涉及到寄存器说明的部分。
+学习本章时，配合《STM32H743用户手册》高级定时器章节一起阅读，效果会更佳，特别是涉及到寄存器说明的部分。
 
-特别说明，本书内容是以STM32H74xx系列控制器资源讲解。
+特别说明，本书内容是以STM32H743系列控制器资源讲解。
 
-上一章我们讲解了基本定时器功能，基本定时器功能简单，理解起来也容易。高级控制定时器包含了通用定时器的功能，再加上已经有了基本定时器基础的基础，如果再把通用定时器单独拿出来讲那内容有很多重复，实际效果不是很好，所以通用定时器不作为独立章节讲解，可以在理解了高级定时器后参考《STM32F7xx中文参考手册》通用定时器章节内容理解即可。
-
+上一章我们讲解了基本定时器功能，基本定时器功能简单，理解起来也容易。高级控制定时器包含了通用定时器的功能，再加上已经有了基本定时器基础的基础，如果再把通用定时器单独拿出来讲那内容有很多重复，实际效果不是很好，所以通用定时器不作为独立章节讲解，可以在理解了高级定时器后参考《STM32H743用户手册》通用定时器章节内容理解即可。
 
 高级控制定时器
 ~~~~~~~~~~~~~~
@@ -17,7 +16,7 @@ TIM—高级定时器
 
 高级控制定时器时基单元包含一个16位自动重载计数器ARR，一个16位的计数器CNT，可向上/下计数，一个16位可编程预分频器PSC，预分频器时钟源有多种可选，有内部的时钟、外部时钟。还有一个8位的重复计数器RCR，这样最高可实现40位的可编程定时。
 
-STM32H743IIT6的高级/通用定时器的IO分配具体见 表32_1_。
+STM32H743的高级/通用定时器的IO分配具体见 表32_1_。
 配套开发板因为IO资源紧缺，定时器的IO很多已经复用它途，故下表中的IO只有部分可用于定时器的实验。
 
 .. _表32_1:
@@ -57,23 +56,23 @@ STM32H743IIT6的高级/通用定时器的IO分配具体见 表32_1_。
 内部时钟源(CK_INT)
 .......................
 
-内部时钟CK_INT即来自于芯片内部，等于216M，一般情况下，我们都是使用内部时钟。当从模式控制寄存器TIMx_SMCR的SMS位等于000时，则使用内部时钟。
+内部时钟CK_INT即来自于芯片内部，等于200M，一般情况下，我们都是使用内部时钟。当从模式控制寄存器TIMx_SMCR的SMS位等于000时，则使用内部时钟。
 
 外部时钟模式1
 .......................
 
 .. image:: media/image2.png
    :align: center
-   :alt: 图 31‑2 外部时钟模式1框图
+   :alt: 图 31‑2 外部时钟模式2框图
    :name: 图31_2
 
 **①：时钟信号输入引脚**
 
-当使用外部时钟模式1的时候，时钟信号来自于定时器的输入通道，总共有4个，分别为TI1/2/3/4，即TIMx_CH1/2/3/4。具体使用哪一路信号，由TIM_CCMRx的位CCxS[1:0]配置，其中CCMR1控制TI1/2，CCMR2控制TI3/4。
+当使用外部时钟模式1的时候，时钟信号来自于定时器的输入通道，总共有4个，分别为TI1/2/3/4，即TIMx_CH1/2/3/4。具体使用哪一路信号，由TIM_CCMx的位CCxS[1:0]配置，其中CCM1的CCxS[1:0](x=1,2)控制TI1/2，CCM2的CCxS[1:0] (x=1,2)控制TI3/4。
 
 **②：滤波器**
 
-如果来自外部的时钟信号的频率过高或者混杂有高频干扰信号的话，我们就需要使用滤波器对信号重新采样，来达到降频或者去除高频干扰的目的，具体的由TIMx_CCMRx的位ICxF[3:0]配置。
+如果来自外部的时钟信号的频率过高或者混杂有高频干扰信号的话，我们就需要使用滤波器对ETRP信号重新采样，来达到降频或者去除高频干扰的目的，具体的由TIMx_CCMx的位ICxF[3:0]配置。
 
 **③：边沿检测**
 
@@ -81,11 +80,11 @@ STM32H743IIT6的高级/通用定时器的IO分配具体见 表32_1_。
 
 **④：触发选择**
 
-当使用外部时钟模式1时，触发源有两个，一个是滤波后的定时器输入1（TI1FP1）和滤波后的定时器输入2（TI2FP2），具体的由TIMxSMCR的位TS[2:0]配置。
+当使用外部时钟模式1时，触发源有两个，一个是滤波后的定时器输入1（TI1FP1）和滤波后的定时器输入2（TI2FP2），具体的由TIMxSMCR的位TS[4:0]配置。
 
 **⑤：从模式选择**
 
-选定了触发源信号后，最后我们需把信号连接到TRGI引脚，让触发信号成为外部时钟模式1的输入，最终等于CK_PSC，然后驱动计数器CNT计数。具体的配置TIMx_SMCR的位SMS[2:0]为000即可选择外部时钟模式1。
+选定了触发源信号后，最后我们需把信号连接到TRGI引脚，让触发信号成为外部时钟模式1的输入，最终等于CK_PSC，然后驱动计数器CNT计数。具体的配置TIMx_SMCR的位SMS[2:0]为0111即可选择外部时钟模式1。
 
 **⑥：使能计数器**
 
@@ -103,7 +102,12 @@ STM32H743IIT6的高级/通用定时器的IO分配具体见 表32_1_。
 
 **①：时钟信号输入引脚**
 
-当使用外部时钟模式2的时候，时钟信号来自于定时器的特定输入通道TIMx_ETR，只有1个。
+当使用外部时钟模式2的时候，时钟信号来自于定时器的特定输入通道TIMx_ETR，比较输出和模拟看门狗，见 图31_2_1_ TIM1和TIM8的ETR输入电路，具体的由TIMx_AF1的位ETRSEL[3:0]配置。
+
+.. image:: media/image3_1.png
+   :align: center
+   :alt: 图 31‑2-1 TIM1和TIM8的ETR输入电路
+   :name: 图31_2_1
 
 **②：外部触发极性**
 
@@ -111,8 +115,7 @@ STM32H743IIT6的高级/通用定时器的IO分配具体见 表32_1_。
 
 **③：外部触发预分频器**
 
-由于ETRP的信号的频率不能超过TIMx_CLK（72M）的1/4，当触发信号的频率很高的情况下，就必须使用分频器来降频，具体的由
-TIMx_SMCR的位ETPS[1:0]配置。
+由于ETRP的信号的频率不能超过TIMx_CLK（200M）的1/4，当触发信号的频率很高的情况下，就必须使用分频器来降频，具体的由 TIMx_SMCR的位ETPS[1:0]配置。
 
 **④：滤波器**
 
@@ -127,18 +130,6 @@ TIMx_SMCR的位ETPS[1:0]配置。
 **⑥：使能计数器**
 
 经过上面的5个步骤之后，最后我们只需使能计数器开始计数，外部时钟模式2的配置就算完成。使能计数器由TIMx_CR1的位CEN配置。
-
-内部触发输入
-.......................
-
-内部触发输入是使用一个定时器作为另一个定时器的预分频器。硬件上高级控制定时器和通用定时器在内部连接在一起，可以实现定时器同步或级联。主模式的定时器可以对从模式定时器执行复位、启动、停止或提供时钟。高级控制定时器和部分通用定时器(TIM2至TIM5)可以设置为主模式或从模式，TIM9和TIM10可设置为从模式。
-
-图31_4_ 为主模式定时器(TIM1)为从模式定时器(TIM2)提供时钟，即TIM1用作TIM2的预分频器。
-
-.. image:: media/image4.png
-   :align: center
-   :alt: 图 31-4 TIM1用作TIM2的预分频器
-   :name: 图31_4
 
 ②控制器
 '''''''
@@ -236,12 +227,15 @@ TIMx_SMCR的位ETPS[1:0]配置。
 
 ICx的输出信号会经过一个预分频器，用于决定发生多少个事件时进行一次捕获。具体的由寄存器CCMRx的位ICxPSC配置，如果希望捕获信号的每一个边沿，则不分频。
 
+.. image:: media/image6_1.png
+   :align: center
+   :alt: 图 31‑7 输入捕获功能框图（续）
+   :name: 图31_6_1
+
 ⑤捕获寄存器
 ...........
 
-经过预分频器的信号ICxPS是最终被捕获的信号，当发生捕获时（第一次），计数器CNT的值会被锁存到捕获寄存器CCR中，还会产生CCxI中断，相应的中断位CCxIF（在SR寄存器中）会被置位，通过软件或者读取CCR中的值可以将CCxIF清0。如果发生第二次捕获（即重复捕获：CCR
-寄存器中已捕获到计数器值且 CCxIF 标志已置
-1），则捕获溢出标志位CCxOF（在SR寄存器中）会被置位，CCxOF只能通过软件清零。
+方框2中，表示的是TIMx_CCMRx寄存器中的CC1S位，只要CC1S不等于00，就会将通道配置为输入模式。经过预分频器的信号ICxPS是最终被捕获的信号（方框1），当发生捕获时（第一次），计数器CNT的值会被锁存到捕获寄存器CCR中（方框3），还会产生CCxI中断，相应的中断位CCxIF（在SR寄存器中）会被置位，通过软件或者读取CCR中的值可以将CCxIF清0。如果发生第二次捕获（即重复捕获：CCR 寄存器中已捕获到计数器值且 CCxIF 标志已置 1），则捕获溢出标志位CCxOF（在SR寄存器中）会被置位，CCxOF只能通过软件清零。
 
 ⑤输出比较
 '''''''''
@@ -249,9 +243,16 @@ ICx的输出信号会经过一个预分频器，用于决定发生多少个事�
 .. image:: media/image7.png
    :align: center
    :alt: 图 31‑7 输出比较功能框图
-   :name: 图31_7
+   :name: 图31_7_1
 
 图 31‑7 输出比较功能框图
+
+.. image:: media/image7_1.png
+   :align: center
+   :alt: 图 31‑7 输出比较功能框图(续)
+   :name: 图31_7
+
+图 31‑7 输出比较功能框图(续)
 
 输出比较就是通过定时器的外部引脚对外输出控制信号，有冻结、将通道X（x=1,2,3,4）设置为匹配时输出有效电平、将通道X设置为匹配时输出无效电平、翻转、强制变为无效电平、强制变为有效电平、PWM1和PWM2这八种模式，具体使用哪种模式由寄存器CCMRx的位OCxM[2:0]配置。其中PWM模式是输出比较中的特例，使用的也最多。
 
@@ -285,13 +286,6 @@ ICx的输出信号会经过一个预分频器，用于决定发生多少个事�
 
 ③输出控制
 .............
-
-.. image:: media/image10.png
-   :align: center
-   :alt: 图 31‑10 输出比较（通道1~3）的输出控制框图
-   :name: 图31_10
-
-图 31‑10 输出比较（通道1~3）的输出控制框图
 
 在输出比较的输出控制中，参考信号OCxREF在经过死区发生器之后会产生两路带死区的互补信号OCx_DT和OCxN_DT（通道1~3才有互补信号，通道4没有，其余跟通道1~3一样），这两路带死区的互补信号然后就进入输出控制电路，如果没有加入死区控制，那么进入输出控制电路的信号就直接是OCxREF。
 
@@ -453,12 +447,12 @@ PWM中心对齐模式
 
 HAL库函数对定时器外设建立了多个初始化结构体，分别为时基初始化结构体TIM_Base_InitTypeDef、输出比较初始化结构体TIM_OC_InitTypeDef、输入捕获初始化结构体TIM_IC_InitTypeDef、单脉冲初始化结构体TIM_OnePulse_InitTypeDef、编码器模式配置初始化结构体TIM_Encoder_InitTypeDef、断路和死区初始化结构体TIM_BreakDeadTimeConfigTypeDef，高级控制定时器可以用到所有初始化结构体，通用定时器不能使用TIM_BreakDeadTimeConfigTypeDef结构体，基本定时器只能使用时基结构体。初始化结构体成员用于设置定时器工作环境参数，并由定时器相应初始化配置函数调用，最终这些参数将会写入到定时器相应的寄存器中。
 
-初始化结构体和初始化库函数配合使用是HAL库精髓所在，理解了初始化结构体每个成员意义基本上就可以对该外设运用自如。初始化结构体定义在STM32F7xx_hal_tim.h和STM32F7xx_hal_tim_ex.h文件中，初始化库函数定义在STM32F7xx_hal_tim.c和STM32F7xx_hal_tim_ex.c文件中，编程时我们可以结合这四个文件内注释使用。
+初始化结构体和初始化库函数配合使用是HAL库精髓所在，理解了初始化结构体每个成员意义基本上就可以对该外设运用自如。初始化结构体定义在stm32h7xx_hal_tim.h和stm32h7xx_hal_tim_ex.h文件中，初始化库函数定义在stm32h7xx_hal_tim.c和stm32h7xx_hal_tim_ex.c文件中，编程时我们可以结合这四个文件内注释使用。
 
-TIM_TimeBaseInitTypeDef
+TIM_HandleTypeDef
 '''''''''''''''''''''''
 
-时基结构体TIM_Base_InitTypeDef用于定时器基础参数设置，与TIM_TimeBaseInit函数配合使用完成配置。
+TIM外设管理结构体TIM_HandleTypeDef用于管理TIM外设的资源。
 
 代码清单 31‑1 定时器基本初始化结构体
 
@@ -466,25 +460,55 @@ TIM_TimeBaseInitTypeDef
    :name: 代码清单31_1
 
     typedef struct {
-        uint16_t Prescaler;          // 预分频器
-        uint16_t CounterMode;        // 计数模式
-        uint32_t Period;             // 定时器周期
-        uint16_t ClockDivision;      // 时钟分频
-        uint8_t  RepetitionCounter;   // 重复计算器
-    } Time_Base_InitTypeDef;
+        TIM_TypeDef              *Instance; /*!< 外设寄存器基地址 */
+        TIM_Base_InitTypeDef     Init;   /*!< 定时器时基单元初始化结构体 */
+        HAL_TIM_ActiveChannel    Channel;  /*!< TIM通道x */
+        DMA_HandleTypeDef        *hdma[7]; /*!< DMA外设管理结构体 */
+        HAL_LockTypeDef          Lock;     /*!< 锁资源 */
+        __IO HAL_TIM_StateTypeDef   State; /*!< TIM工作状态 */
+    } TIM_HandleTypeDef;
+
+(1)	Instance：TIM寄存器基地址指针，所有参数都是指定基地址后才能正确写入寄存器。
+
+(2)	Init：TIM时基单元初始化结构体，下面会详细讲解每一个成员。
+
+(3)	Channel：TIMx的通道，可以选择HAL_TIM_ACTIVE_CHANNEL_1~HAL_TIM_ACTIVE_CHANNEL_6。
+
+(4)	DMA_Handle：DMA外设管理结构体，用来配置TIM的DMA请求。
+
+(5)	Lock：ADC锁资源。
+
+(6)	State：TIM的工作状态。有HAL_TIM_STATE_READY，HAL_TIM_STATE_BUSY，HAL_TIM_STATE_TIMEOUT和HAL_TIM_STATE_ERROR等工作状态，方便用户排除错误。
+
+TIM_Base_InitTypeDef
+'''''''''''''''''''''''
+
+.. code-block:: c
+   :name: 代码清单31_1_1
+
+    typedef struct {
+        uint32_t Prescaler;         /*!< 预分频器 */
+        uint32_t CounterMode;       /*!< 计数模式 */
+        uint32_t Period;            /*!< 定时器周期*/
+        uint32_t ClockDivision;     /*!< 时钟分频 */
+        uint32_t RepetitionCounter;  /*!< 重复计数器 */
+        uint32_t AutoReloadPreload;  /*!< 自动重装载寄存器的值 */
+    } TIM_Base_InitTypeDef; 
 
 (1) Prescaler：定时器预分频器设置，时钟源经该预分频器才是定时器计数时钟CK_CNT，它设定PSC寄存器的值。计算公式为：计数器时钟频率
     (f:sub:`CK_CNT`) 等于 f\ :sub:`CK_PSC` / (PSC[15:0] +
     1)，可实现1至65536分频。
 
-(2) CounterMode：定时器计数方式，可设置为向上计数、向下计数以及中心对齐。高级控制定时器允许选择任意一种。
+(2)	CounterMode：定时器计数方式，可设置为向上计数、向下计数以及中心对齐。高级控制定时器允许选择任意一种。
 
-(3) Period：定时器周期，实际就是设定自动重载寄存器ARR的值，ARR
-    为要装载到实际自动重载寄存器（即影子寄存器）的值，可设置范围为0至65535。
+(3)	Period：定时器周期，实际就是设定自动重载寄存器ARR的值，ARR 为要装载到实际自动重载寄存器（即影子寄存器）的值，可设置范围为0至65535。
 
-(4) ClockDivision：时钟分频，设置定时器时钟CK_INT频率与死区发生器以及数字滤波器采样时钟频率分频比。可以选择1、2、4分频。
+(4)	ClockDivision：时钟分频，设置定时器时钟CK_INT频率与死区发生器以及数字滤波器采样时钟频率分频比。可以选择1、2、4分频。
 
-(5) RepetitionCounter：重复计数器，只有8位，只存在于高级定时器。
+(5)	RepetitionCounter：重复计数器，只有8位，只存在于高级定时器。
+
+(6)	AutoReloadPreload：自动重装载计数器的值。当ARPE位置0时，自动重装载计算器的值会立刻生效。
+
 
 TIM_OC_InitTypeDef
 ''''''''''''''''''
@@ -715,61 +739,72 @@ PWM互补输出实验
 .. code-block:: c
    :name: 代码清单31_7
 
-    static void TIM_Mode_Config(void)
+    static void TIMx_Configuration(void)
     {
-        TIM_BreakDeadTimeConfigTypeDef TIM_BDTRInitStructure;
-        // 开启TIMx_CLK,x[1,8]
+        //使能TIMx的时钟
         ADVANCE_TIM_CLK_ENABLE();
-        /* 定义定时器的句柄即确定定时器寄存器的基地址*/
-        TIM_TimeBaseStructure.Instance = ADVANCE_TIM;
+        //TIMx的外设寄存器基地址
+        TIM_Handle.Instance = ADVANCE_TIM;
+        //计数模式为向上计数，递增
+        TIM_Handle.Init.CounterMode = TIM_COUNTERMODE_UP;
         /* 累计 TIM_Period个后产生一个更新或者中断*/
-        //当定时器从0计数到999，即为1000次，为一个定时周期
-        TIM_TimeBaseStructure.Init.Period = 1000-1;
-        // 高级控制定时器时钟源TIMxCLK = HCLK=216MHz
-        // 设定定时器频率为=TIMxCLK/(TIM_Prescaler+1)=1MHz
-        TIM_TimeBaseStructure.Init.Prescaler = 216-1;
-        // 采样时钟分频
-        TIM_TimeBaseStructure.Init.ClockDivision=TIM_CLOCKDIVISION_DIV1;
-        // 计数方式
-        TIM_TimeBaseStructure.Init.CounterMode=TIM_COUNTERMODE_UP;
-        // 重复计数器
-        TIM_TimeBaseStructure.Init.RepetitionCounter=0;
-        // 初始化定时器TIMx, x[1,8]
-        HAL_TIM_PWM_Init(&TIM_TimeBaseStructure);
+        //当定时器从0计数到9999，即为10000次，为一个定时周期
+        TIM_Handle.Init.Period = 10000 - 1;
+        //时钟不分频，即一个TIM_CLK时钟计1次
+        TIM_Handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+        //定时器时钟源TIMxCLK = 2 * PCLK1
+        //        PCLK1 = HCLK / 4
+        //        => TIMxCLK=HCLK/2=SystemCoreClock/2=200MHz
+        // 设定定时器频率为=TIMxCLK/(TIM_Prescaler+1)=1000000Hz
+        TIM_Handle.Init.Prescaler =  200 - 1;
+        // 初始化定时器TIM
+        HAL_TIM_PWM_Init(&TIM_Handle);
 
-        /*PWM模式配置*/
-        //配置为PWM模式1
-        TIM_OCInitStructure.OCMode = TIM_OCMODE_PWM1;
-        TIM_OCInitStructure.Pulse = ChannelPulse;
-        TIM_OCInitStructure.OCPolarity = TIM_OCPOLARITY_HIGH;
-        TIM_OCInitStructure.OCNPolarity = TIM_OCNPOLARITY_HIGH;
-        TIM_OCInitStructure.OCIdleState = TIM_OCIDLESTATE_SET;
-        TIM_OCInitStructure.OCNIdleState = TIM_OCNIDLESTATE_RESET;
-        //初始化通道1输出PWM
-        HAL_TIM_PWM_ConfigChannel(&TIM_TimeBaseStructure,&TIM_OCInitStructure,TIM_CHANNEL_1);
+        /* 配置TIM为互补输出模式 */
+        //互补输出，PWM1模式
+        //计数值CNT小于比较值CCR（sConfig.Pulse），通道x为有效电平
+        //计数值CNT大于比较值CCR（sConfig.Pulse），通道x为无效电平
+        sConfig.OCMode = TIM_OCMODE_PWM1;
+        //CHx的有效电平为高电平
+        sConfig.OCPolarity = TIM_OCPOLARITY_HIGH;
+        //CHx在空闲状态下为低电平
+        sConfig.OCIdleState = TIM_OCNIDLESTATE_RESET;
+        //CHxN在空闲状态下为高电平(必须与CHx相反)
+        sConfig.OCNIdleState = TIM_OCIDLESTATE_SET;
+        //CHxN的有效电平为高电平
+        sConfig.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+        //比较器CCR的值
+        sConfig.Pulse = ChannelPulse;
+        //初始化输出比较通道
+        HAL_TIM_PWM_ConfigChannel(&TIM_Handle, &sConfig, ADVANCE_TIM_CH);
 
-        /* 自动输出使能，断路、死区时间和锁定配置 */
-        TIM_BDTRInitStructure.OffStateRunMode = TIM_OSSR_ENABLE;
-        TIM_BDTRInitStructure.OffStateIDLEMode = TIM_OSSI_ENABLE;
-        TIM_BDTRInitStructure.LockLevel = TIM_LOCKLEVEL_1;
-        TIM_BDTRInitStructure.DeadTime = 11;
-        TIM_BDTRInitStructure.BreakState = TIM_BREAK_ENABLE;
-        TIM_BDTRInitStructure.BreakPolarity = TIM_BREAKPOLARITY_LOW;
-        TIM_BDTRInitStructure.AutomaticOutput = TIM_AUTOMATICOUTPUT_ENABLE;
-        HAL_TIMEx_ConfigBreakDeadTime(&TIM_TimeBaseStructure, &TIM_BDTRInitStructure);
-
-        /* 定时器通道1输出PWM */
-        HAL_TIM_PWM_Start(&TIM_TimeBaseStructure,TIM_CHANNEL_1);
-        /* 定时器通道1互补输出PWM */
-        HAL_TIMEx_PWMN_Start(&TIM_TimeBaseStructure,TIM_CHANNEL_1);
+        //使能自动输出功能
+        sBreakDeadTimeConfig.AutomaticOutput = TIM_AUTOMATICOUTPUT_ENABLE;
+        //断路输入极性：低电平有效
+        sBreakDeadTimeConfig.BreakPolarity = TIM_BREAKPOLARITY_HIGH;
+        //使能断路功能
+        sBreakDeadTimeConfig.BreakState = TIM_BREAK_ENABLE;
+        //死区时间：11*Fdts
+        sBreakDeadTimeConfig.DeadTime = 11;
+        //对寄存器提供写保护，级别越高，可操作的寄存器位越少
+        sBreakDeadTimeConfig.LockLevel = TIM_LOCKLEVEL_1;
+        //空闲模式下的断路状态，允许通道输出
+        sBreakDeadTimeConfig.OffStateIDLEMode = TIM_OSSI_ENABLE;
+        //运行模式下的断路状态，允许通道输出
+        sBreakDeadTimeConfig.OffStateRunMode = TIM_OSSR_ENABLE;
+        //配置TIM为死区，断路功能
+        HAL_TIMEx_ConfigBreakDeadTime(&TIM_Handle, &sBreakDeadTimeConfig);
+        //主动输出CHx使能
+        HAL_TIM_PWM_Start(&TIM_Handle, ADVANCE_TIM_CH);
+        //主动输出CHxN使能
+        HAL_TIMEx_PWMN_Start(&TIM_Handle, ADVANCE_TIM_CH);
     }
-
 
 首先定义三个定时器初始化结构体，定时器模式配置函数主要就是对这三个结构体的成员进行初始化，然后通过相应的初始化函数把这些参数写入定时器的寄存器中。有关结构体的成员介绍请参考定时器初始化结构体详解小节。
 
-不同的定时器可能对应不同的APB总线，在使能定时器时钟是必须特别注意。高级控制定时器属于APB2，定时器内部时钟是216MHz。
+不同的定时器可能对应不同的APB总线，在使能定时器时钟是必须特别注意。高级控制定时器属于APB2，定时器内部时钟是200MHz。
 
-在时基结构体中我们设置定时器周期参数为1000，频率为1MHz，使用向上计数方式。因为我们使用的是内部时钟，所以外部时钟采样分频成员不需要设置，重复计数器我们没用到，也不需要设置。
+在时基结构体中我们设置定时器周期参数10000，频率为1MHz，使用向上计数方式。因为我们使用的是内部时钟，所以外部时钟采样分频成员不需要设置，重复计数器我们没用到，也不需要设置。
 
 在输出比较结构体中，设置输出模式为PWM1模式，主通道和互补通道输出高电平有效，设置脉宽为ChannelPulse，ChannelPulse是我们定义的一个无符号16位整形的全局变量，用来指定占空比大小，实际上脉宽就是设定比较寄存器CCR的值，用于跟计数器CNT的值比较。
 
@@ -787,31 +822,33 @@ PWM互补输出实验
 
     int main(void)
     {
-        /* 初始化系统时钟为216MHz */
+
+        /* 系统时钟初始化成400MHz */
         SystemClock_Config();
         /* 初始化按键GPIO */
         Key_GPIO_Config();
         /* 初始化基本定时器定时，1s产生一次中断 */
-        TIMx_Configuration();
+        TIM_Advance_Init();
+
 
         while (1) {
             /* 扫描KEY1 */
             if ( Key_Scan(KEY1_GPIO_PORT,KEY1_PIN) == KEY_ON  ) {
                 /* 增大占空比 */
-                if (ChannelPulse<950)
-                    ChannelPulse+=50;
+                if (ChannelPulse<10000)
+                    ChannelPulse+=1000;
                 else
-                    ChannelPulse=1000;
-                __HAL_TIM_SetCompare(&TIM_TimeBaseStructure,TIM_CHANNEL_1,ChannelPulse);
+                    ChannelPulse=10000;
+                __HAL_TIM_SetCompare(&TIM_Handle,TIM_CHANNEL_1,ChannelPulse);
             }
             /* 扫描KEY2 */
             if ( Key_Scan(KEY2_GPIO_PORT,KEY2_PIN) == KEY_ON  ) {
                 /* 减小占空比 */
-                if (ChannelPulse>=50)
-                    ChannelPulse-=50;
+                if (ChannelPulse>=1000)
+                    ChannelPulse-=1000;
                 else
                     ChannelPulse=0;
-                __HAL_TIM_SetCompare(&TIM_TimeBaseStructure,TIM_CHANNEL_1,ChannelPulse);
+                __HAL_TIM_SetCompare(&TIM_Handle,TIM_CHANNEL_1,ChannelPulse);
             }
         }
     }
@@ -869,32 +906,32 @@ PWM输入捕获实验
    :caption: 代码清单 31‑9 宏定义
    :name: 代码清单31_9
 
-    /* 通用定时器 */
+    //通用定时器宏定义
     #define GENERAL_TIM                       TIM2
     #define GENERAL_TIM_CLK_ENABLE()          __TIM2_CLK_ENABLE()
+    #define GENERAL_TIM_CH                    TIM_CHANNEL_1
+    //通用定时器TIM通道CH1宏定义
+    #define GENERAL_TIM_CHx_CLK()            __GPIOA_CLK_ENABLE()
+    #define GENERAL_TIM_CHx_PORT             GPIOA
+    #define GENERAL_TIM_CHx_PIN              GPIO_PIN_5
 
-    /* 通用定时器PWM输出 */
-    /* PWM输出引脚 */
-    #define GENERAL_OCPWM_PIN                 GPIO_PIN_5
-    #define GENERAL_OCPWM_GPIO_PORT           GPIOA
-    #define GENERAL_OCPWM_GPIO_CLK_ENABLE()   __GPIOA_CLK_ENABLE()
-    #define GENERAL_OCPWM_AF          	GPIO_AF1_TIM2
 
-    /* 高级控制定时器 */
+    //高级定时器宏定义
     #define ADVANCE_TIM                       TIM8
     #define ADVANCE_TIM_CLK_ENABLE()          __TIM8_CLK_ENABLE()
+    #define ADVANCE_TIM_CH                    TIM_CHANNEL_1
+    //TIM通道CH1的引脚宏定义
+    #define ADVANCE_TIM_CHx_CLK()             __GPIOC_CLK_ENABLE()
+    #define ADVANCE_TIM_CHx_PORT              GPIOC
+    #define ADVANCE_TIM_CHx_PIN               GPIO_PIN_6
+    //TIM通道CH1N的引脚宏定义
+    #define ADVANCE_TIM_CHxN_CLK()            __GPIOA_CLK_ENABLE()
+    #define ADVANCE_TIM_CHxN_PORT             GPIOA
+    #define ADVANCE_TIM_CHxN_PIN              GPIO_PIN_5
 
-    /* 捕获/比较中断 */
-    #define ADVANCE_TIM_IRQn                  TIM8_CC_IRQn
+
+    #define ADVANCE_TIM_IRQ                   TIM8_CC_IRQn
     #define ADVANCE_TIM_IRQHandler            TIM8_CC_IRQHandler
-    /* 高级控制定时器PWM输入捕获 */
-    /* PWM输入捕获引脚 */
-    #define ADVANCE_ICPWM_PIN                 GPIO_PIN_6
-    #define ADVANCE_ICPWM_GPIO_PORT           GPIOC
-    #define ADVANCE_ICPWM_GPIO_CLK_ENABLE()   __GPIOC_CLK_ENABLE()
-    #define ADVANCE_ICPWM_AF                  GPIO_AF3_TIM8
-    #define ADVANCE_IC1PWM_CHANNEL            TIM_CHANNEL_1
-    #define ADVANCE_IC2PWM_CHANNEL            TIM_CHANNEL_2
 
 使用宏定义非常方便程序升级、移植。如果使用不同的定时器IO，修改这些宏即可。
 
@@ -906,28 +943,26 @@ PWM输入捕获实验
 .. code-block:: c
    :name: 代码清单31_10
 
-    static void TIMx_GPIO_Config(void)
+    static void TIMx_GPIO_Configuration(void)
     {
-        /*定义一个GPIO_InitTypeDef类型的结构体*/
-        GPIO_InitTypeDef GPIO_InitStructure;
+        GPIO_InitTypeDef GPIO_InitStruct;
+        //使能高级定时器的引脚时钟
+        ADVANCE_TIM_CHx_CLK();
+        //使能通用定时器的引脚时钟
+        GENERAL_TIM_CHx_CLK();
 
-        /*开启定时器相关的GPIO外设时钟*/
-        GENERAL_OCPWM_GPIO_CLK_ENABLE();
-        ADVANCE_ICPWM_GPIO_CLK_ENABLE();
 
-        /* 定时器功能引脚初始化 */
-        /* 通用定时器PWM输出引脚 */
-        GPIO_InitStructure.Pin = GENERAL_OCPWM_PIN;
-        GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
-        GPIO_InitStructure.Pull = GPIO_NOPULL;
-        GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
-        GPIO_InitStructure.Alternate = GENERAL_OCPWM_AF;
-        HAL_GPIO_Init(GENERAL_OCPWM_GPIO_PORT, &GPIO_InitStructure);
+        GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
+        GPIO_InitStruct.Pull = GPIO_NOPULL;
+        GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH ;
 
-        /* 高级定时器输入捕获引脚 */
-        GPIO_InitStructure.Pin = ADVANCE_ICPWM_PIN;
-        GPIO_InitStructure.Alternate = ADVANCE_ICPWM_AF;
-        HAL_GPIO_Init(ADVANCE_ICPWM_GPIO_PORT, &GPIO_InitStructure);
+        GPIO_InitStruct.Pin = GENERAL_TIM_CHx_PIN;
+        GPIO_InitStruct.Alternate = GPIO_AF1_TIM2;
+        HAL_GPIO_Init(GENERAL_TIM_CHx_PORT, &GPIO_InitStruct);
+
+        GPIO_InitStruct.Pin = ADVANCE_TIM_CHx_PIN;
+        GPIO_InitStruct.Alternate = GPIO_AF3_TIM8;
+        HAL_GPIO_Init(ADVANCE_TIM_CHx_PORT, &GPIO_InitStruct);
     }
 
 定时器通道引脚使用之前必须设定相关参数，这选择复用功能，并指定到对应的定时器。使用GPIO之前都必须开启相应端口时钟。
@@ -937,12 +972,10 @@ PWM输入捕获实验
 
 .. code-block:: c
 
-    static void TIMx_NVIC_Configuration(void)
+    static void ADVANCE_TIM_NVIC_Config(void)
     {
-        //设置抢占优先级，子优先级
-        HAL_NVIC_SetPriority(ADVANCE_TIM_IRQn, 0, 3);
-        // 设置中断来源
-        HAL_NVIC_EnableIRQ(ADVANCE_TIM_IRQn);
+        HAL_NVIC_SetPriority(ADVANCE_TIM_IRQ, 0, 0);
+        HAL_NVIC_EnableIRQ(ADVANCE_TIM_IRQ);
     }
 
 实验用到高级控制定时器捕获/比较中断，需要配置中断优先级，因为实验只用到一个中断，所以这里对优先级配置没具体要求，只要符合中断组参数要求即可。
@@ -955,41 +988,48 @@ PWM输入捕获实验
 .. code-block:: c
    :name: 代码清单31_11
 
-    static void TIM_PWMOUTPUT_Config(void)
+    static void TIMx_Output_Configuration(void)
     {
-        TIM_OC_InitTypeDef TIM_OCInitStructure;
-        // 开启TIMx_CLK,x[2,3,4,5,12,13,14]
+        //使能TIMx的时钟
         GENERAL_TIM_CLK_ENABLE();
-        /* 定义定时器的句柄即确定定时器寄存器的基地址*/
-        TIM_PWMOUTPUT_Handle.Instance = GENERAL_TIM;
+        //TIMx的外设寄存器基地址
+        TIM_PWMOUTNPUT_Handle.Instance = GENERAL_TIM;
+        //计数模式为向上计数，递增
+        TIM_PWMOUTNPUT_Handle.Init.CounterMode = TIM_COUNTERMODE_UP;
         /* 累计 TIM_Period个后产生一个更新或者中断*/
         //当定时器从0计数到9999，即为10000次，为一个定时周期
-        TIM_PWMOUTPUT_Handle.Init.Period = 10000-1;
-        // 高级控制定时器时钟源TIMxCLK = HCLK=108MHz
-        // 设定定时器频率为=TIMxCLK/(TIM_Prescaler+1)=100KHz
-        TIM_PWMOUTPUT_Handle.Init.Prescaler = 108-1;
-        // 采样时钟分频
-        TIM_PWMOUTPUT_Handle.Init.ClockDivision=TIM_CLOCKDIVISION_DIV1;
-        // 计数方式
-        TIM_PWMOUTPUT_Handle.Init.CounterMode=TIM_COUNTERMODE_UP;
-        // 重复计数器
-        TIM_PWMOUTPUT_Handle.Init.RepetitionCounter=0;
-        // 初始化定时器TIMx, x[1,8]
-        HAL_TIM_PWM_Init(&TIM_PWMOUTPUT_Handle);
+        TIM_PWMOUTNPUT_Handle.Init.Period = 10000 - 1;
+        //时钟不分频，即一个TIM_CLK时钟计1次
+        TIM_PWMOUTNPUT_Handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+        //定时器时钟源TIMxCLK = 2 * PCLK1
+        //        PCLK1 = HCLK / 4
+        //        => TIMxCLK=HCLK/2=SystemCoreClock/2=200MHz
+        // 设定定时器频率为=TIMxCLK/(TIM_Prescaler+1)=1000000Hz
+        TIM_PWMOUTNPUT_Handle.Init.Prescaler =  200 - 1;
+        // 初始化定时器TIM
+        HAL_TIM_PWM_Init(&TIM_PWMOUTNPUT_Handle);
 
-        /*PWM模式配置*/
-        //配置为PWM模式1
-        TIM_OCInitStructure.OCMode = TIM_OCMODE_PWM1;
-        TIM_OCInitStructure.Pulse = 5000;
-        TIM_OCInitStructure.OCPolarity = TIM_OCPOLARITY_HIGH;
-        TIM_OCInitStructure.OCNPolarity = TIM_OCNPOLARITY_HIGH;
-        TIM_OCInitStructure.OCIdleState = TIM_OCIDLESTATE_SET;
-        TIM_OCInitStructure.OCNIdleState = TIM_OCNIDLESTATE_RESET;
-        //初始化通道1输出PWM
-        HAL_TIM_PWM_ConfigChannel(&TIM_PWMOUTPUT_Handle,&TIM_OCInitStructure,TIM_CHANNEL_1);
+        /* 配置TIM为互补输出模式 */
+        //互补输出，PWM1模式
+        //计数值CNT小于比较值CCR（sConfig.Pulse），通道x为有效电平
+        //计数值CNT大于比较值CCR（sConfig.Pulse），通道x为无效电平
+        sConfig.OCMode = TIM_OCMODE_PWM1;
+        //CHx的有效电平为高电平
+        sConfig.OCPolarity = TIM_OCPOLARITY_HIGH;
+        //CHx在空闲状态下为低电平
+        sConfig.OCIdleState = TIM_OCNIDLESTATE_RESET;
+        //CHxN在空闲状态下为高电平(必须与CHx相反)
+        sConfig.OCNIdleState = TIM_OCIDLESTATE_SET;
+        //CHxN的有效电平为高电平
+        sConfig.OCNPolarity = TIM_OCNPOLARITY_HIGH;
+        //比较器CCR的值
+        sConfig.Pulse = ChannelPulse;
+        //初始化输出比较通道
+        HAL_TIM_OC_ConfigChannel(&TIM_PWMOUTNPUT_Handle, &sConfig, GENERAL_TIM_CH);
 
-        /* 定时器通道1输出PWM */
-        HAL_TIM_PWM_Start(&TIM_PWMOUTPUT_Handle,TIM_CHANNEL_1);
+        //主动输出CHx使能
+        HAL_TIM_OC_Start(&TIM_PWMOUTNPUT_Handle, GENERAL_TIM_CH);
+
     }
 
 定时器PWM输出模式配置函数很简单，看代码注释即可。这里我们设置了PWM的频率为100Hz，
@@ -1003,50 +1043,52 @@ PWM输入捕获实验
 .. code-block:: c
    :name: 代码清单PWM输入模式配置
 
-    static void TIM_PWMINPUT_Config(void)
+    static void TIMx_Input_Configuration(void)
     {
-        TIM_IC_InitTypeDef    TIM_ICInitStructure;
-        TIM_SlaveConfigTypeDef  TIM_SlaveConfigStructure;
-        // 开启TIMx_CLK,x[1,8]
+    
+        TIM_IC_InitTypeDef TIM_IC_Config;
+        TIM_SlaveConfigTypeDef TIM_SlaveConfig;
+    
+        //使能TIMx的时钟
         ADVANCE_TIM_CLK_ENABLE();
-        /* 定义定时器的句柄即确定定时器寄存器的基地址*/
+        //TIMx的外设寄存器基地址
         TIM_PWMINPUT_Handle.Instance = ADVANCE_TIM;
-        TIM_PWMINPUT_Handle.Init.Period = 0xFFFF;
-        // 高级控制定时器时钟源TIMxCLK = HCLK=216MHz
-        // 设定定时器频率为=TIMxCLK/(TIM_Prescaler+1)=1MHz
-        TIM_PWMINPUT_Handle.Init.Prescaler = 216-1;
-        // 采样时钟分频
-        TIM_PWMINPUT_Handle.Init.ClockDivision=TIM_CLOCKDIVISION_DIV1;
-        // 计数方式
-        TIM_PWMINPUT_Handle.Init.CounterMode=TIM_COUNTERMODE_UP;
-        // 初始化定时器TIMx, x[1,8]
-        HAL_TIM_IC_Init(&TIM_PWMINPUT_Handle);
-
-        /* IC1捕获：上升沿触发 TI1FP1 */
-        TIM_ICInitStructure.ICPolarity = TIM_ICPOLARITY_RISING;
-        TIM_ICInitStructure.ICSelection = TIM_ICSELECTION_DIRECTTI;
-        TIM_ICInitStructure.ICPrescaler = TIM_ICPSC_DIV1;
-        TIM_ICInitStructure.ICFilter = 0x0;
-        HAL_TIM_IC_ConfigChannel(&TIM_PWMINPUT_Handle,&TIM_ICInitStructure,ADVANCE_IC1PWM_CHANNEL);
-
-        /* IC2捕获：下降沿触发 TI1FP2 */
-        TIM_ICInitStructure.ICPolarity = TIM_ICPOLARITY_FALLING;
-        TIM_ICInitStructure.ICSelection = TIM_ICSELECTION_INDIRECTTI;
-        TIM_ICInitStructure.ICPrescaler = TIM_ICPSC_DIV1;
-        TIM_ICInitStructure.ICFilter = 0x0;
-
-        HAL_TIM_IC_ConfigChannel(&TIM_PWMINPUT_Handle,&TIM_ICInitStructure,ADVANCE_IC2PWM_CHANNEL);
-
+        //计数模式为向上计数，递增
+        TIM_PWMINPUT_Handle.Init.CounterMode = TIM_COUNTERMODE_UP;
+        /* 累计 TIM_Period个后产生一个更新或者中断*/
+        //当定时器从0计数到9999，即为10000次，为一个定时周期
+        TIM_PWMINPUT_Handle.Init.Period = 10000;
+        //时钟不分频，即一个TIM_CLK时钟计1次
+        TIM_PWMINPUT_Handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+        //定时器时钟源TIMxCLK = 2 * PCLK1
+        //        PCLK1 = HCLK / 4
+        //        => TIMxCLK=HCLK/2=SystemCoreClock/2=200MHz
+        // 设定定时器频率为=TIMxCLK/(TIM_Prescaler+1)=100Hz
+        TIM_PWMINPUT_Handle.Init.Prescaler =  200 - 1;
+        // 初始化定时器TIM
+        HAL_TIM_PWM_Init(&TIM_PWMINPUT_Handle);
+    
+        /* IC1捕获：上升沿触发TI1FP1 */
+        TIM_IC_Config.ICPolarity = TIM_ICPOLARITY_RISING;
+        TIM_IC_Config.ICFilter = 0;
+        TIM_IC_Config.ICPrescaler = TIM_ICPSC_DIV1;
+        TIM_IC_Config.ICSelection = TIM_ICSELECTION_DIRECTTI;
+        HAL_TIM_IC_ConfigChannel(&TIM_PWMINPUT_Handle, &TIM_IC_Config, ADVANCE_TIM_IC_CH1);
+        /* IC2捕获：上升沿触发TI1FP2 */
+        TIM_IC_Config.ICPolarity = TIM_ICPOLARITY_FALLING;
+        TIM_IC_Config.ICFilter = 0;
+        TIM_IC_Config.ICPrescaler = TIM_ICPSC_DIV1;
+        TIM_IC_Config.ICSelection = TIM_ICSELECTION_INDIRECTTI;
+        HAL_TIM_IC_ConfigChannel(&TIM_PWMINPUT_Handle, &TIM_IC_Config, ADVANCE_TIM_IC_CH2);
         /* 选择从模式: 复位模式 */
-        TIM_SlaveConfigStructure.SlaveMode = TIM_SLAVEMODE_RESET;
+        TIM_SlaveConfig.SlaveMode = TIM_SLAVEMODE_RESET;
         /* 选择定时器输入触发: TI1FP1 */
-        TIM_SlaveConfigStructure.InputTrigger = TIM_TS_TI1FP1;
-        HAL_TIM_SlaveConfigSynchronization(&TIM_PWMINPUT_Handle,&TIM_SlaveConfigStructure);
-
-        /* 使能捕获/比较2中断请求 */
-        HAL_TIM_IC_Start_IT(&TIM_PWMINPUT_Handle,TIM_CHANNEL_1);
-        HAL_TIM_IC_Start_IT(&TIM_PWMINPUT_Handle,TIM_CHANNEL_2);
-    }
+        TIM_SlaveConfig.InputTrigger = TIM_TS_TI1FP1;
+        HAL_TIM_SlaveConfigSynchronization(&TIM_PWMINPUT_Handle,&TIM_SlaveConfig);
+    
+        HAL_TIM_IC_Start_IT(&TIM_PWMINPUT_Handle,ADVANCE_TIM_IC_CH1);
+        HAL_TIM_IC_Start_IT(&TIM_PWMINPUT_Handle,ADVANCE_TIM_IC_CH2);
+    } 
 
 输入捕获配置中，主要初始化三个结构体，时基结构体部分很简单，看注释理解即可。关键部分是输入捕获结构体和从模式结构体的初始化。
 
@@ -1054,11 +1096,11 @@ PWM输入捕获实验
 
 我们知道，PWM输入模式，需要使用两个捕获通道，占用两个捕获寄存器。由输入通道TI1输入的信号会分成TI1FP1和TI1FP2，具体选择哪一路信号作为捕获触发信号决定着哪个捕获通道测量的是周期。这里我们选择TI1FP1作为捕获的触发信号，那PWM信号的周期则存储在CCR1寄存器中，剩下的另外一路信号TI1FP2则进入IC2，CCR2寄存器存储的是脉冲宽度。
 
-测量脉冲宽度我们选择捕获通道2，即IC2，设置捕获信号的极性，这里我们配置为下降沿，我们需要对捕获信号的每个有效边沿（即我们设置的下降沿）都捕获，所以我们不分频，滤波器我们也不需要用。那么捕获通道的信号来源于TI2输入的TI2FP1，这里选择间接（INDIRECTTI），PWM信号从IC1输入再进入IC2.
+测量脉冲宽度我们选择捕获通道2，即IC2，设置捕获信号的极性，这里我们配置为下降沿，我们需要对捕获信号的每个有效边沿（即我们设置的下降沿）都捕获，所以我们不分频，滤波器我们也不需要用。那么捕获通道的信号来源于TI2输入的TI2FP1，这里选择间接（INDIRECTTI），T1的PWM信号进入IC2。这里配置通道2，主要为了是T1的输入连接到IC2，T2的输入连接到IC1。满足图 3 13 输入通道和捕获通道的关系映射图的映射关系。
 
 I2C作为间接输入模式，我们需要配置他的从模式，即从模式复位模式，定时器触发源为TIM_TS_TI1FP1，最后使用函数HAL_TIM_SlaveConfigSynchronization进行配置。
 
-最后启动定时器的两个通道捕获。
+最后调用函数HAL_TIM_IC_Start_IT启动定时器的两个通道捕获。
 
 高级控制定时器中断服务函数
 ============================
@@ -1070,20 +1112,19 @@ I2C作为间接输入模式，我们需要配置他的从模式，即从模式�
     {
         if (htim->Channel == HAL_TIM_ACTIVE_CHANNEL_1) {
             /* 获取输入捕获值 */
-            IC1Value = HAL_TIM_ReadCapturedValue(&TIM_PWMINPUT_Handle,ADVANCE_IC1PWM_CHANNEL);
-            IC2Value = HAL_TIM_ReadCapturedValue(&TIM_PWMINPUT_Handle,ADVANCE_IC2PWM_CHANNEL);
+            IC1Value = HAL_TIM_ReadCapturedValue(&TIM_PWMINPUT_Handle,TIM_CHANNEL_1);
+            IC2Value = HAL_TIM_ReadCapturedValue(&TIM_PWMINPUT_Handle,TIM_CHANNEL_2);
             if (IC1Value != 0) {
                 /* 占空比计算 */
                 DutyCycle = (float)((IC2Value+1) * 100) / (IC1Value+1);
-
+    
                 /* 频率计算 */
-                Frequency = 216000000/216/(float)(IC1Value+1);
-
+                Frequency = 200000000/200/(float)(IC1Value+1);
+    
             } else {
                 DutyCycle = 0;
                 Frequency = 0;
             }
-
         }
     }
 
@@ -1101,12 +1142,13 @@ I2C作为间接输入模式，我们需要配置他的从模式，即从模式�
 
     int main(void)
     {
-        /* 初始化系统时钟为216MHz */
+
+        /* 系统时钟初始化成400MHz */
         SystemClock_Config();
         /* 初始化串口 */
-        UARTx_Config();
+        DEBUG_USART_Config();
         /* 初始化基本定时器定时，1s产生一次中断 */
-        TIMx_Configuration();
+        TIM_Advance_Init();
 
         while (1) {
             HAL_Delay(500);
@@ -1115,9 +1157,9 @@ I2C作为间接输入模式，我们需要配置他的从模式，即从模式�
         }
     }
 
-主函数内容非常简单，首先初始化系统时钟、调用UARTx_Config函数完成串口初始化配置，该函定义在bsp _usart.c文件内。
+主函数内容非常简单，首先初始化系统时钟、调用DEBUG_USART_Config函数完成串口初始化配置，该函定义在bsp _usart.c文件内。
 
-接下来就是调用TIMx_Configuration函数完成定时器配置，该函数定义在bsp_advance_tim.c文件内，它只是简单的分别调用TIMx_GPIO_Config()、TIMx_NVIC_Configuration()、TIM_PWMOUTPUT_Config()和TIM_PWMINPUT_Config()四个函数，完成定时器引脚初始化配置，NVIC配置，通用定时器输出PWM以及高级控制定时器PWM输入模式配置。
+接下来就是调用TIM_Advance_Init函数完成定时器配置，该函数定义在bsp_advance_tim.c文件内，它只是简单的分别调用TIMx_GPIO_Configuration ()、ADVANCE_TIM_NVIC_Config ()、TIMx_Output_Configuration ()和TIMx_Input_Configuration ()四个函数，完成定时器引脚初始化配置，NVIC配置，通用定时器输出PWM以及高级控制定时器PWM输入模式配置。
 
 主函数的无限循环每隔500ms输出一次捕获结果。
 

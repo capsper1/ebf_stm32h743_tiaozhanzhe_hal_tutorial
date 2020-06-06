@@ -1,7 +1,7 @@
 TIM—电容按键检测
 ----------------
 
-本章参考资料：《STM32H74xxx参考手册》、《STM32F7xx规格书》、库帮助文档《STM32F779xx_User_Manual.chm》。
+本章参考资料：《STM32H743用户手册》、《STM32H743xI规格书》、库帮助文档《STM32H753xx_User_Manual.chm》。
 
 前面章节我们讲解了基本定时器和高级控制定时器功能，这一章我们将介绍定时器输入捕获一个应用实例，帮助我们更加深入理解定时器。
 
@@ -133,46 +133,45 @@ TIM—电容按键检测
 定时器初始化配置
 =====================
 
-定时器初始化配置
+定时器初始化配置（bsp_touchpad.c文件）
 
 .. code-block:: c
 
-    static void TIMx_CHx_Cap_Init(uint32_t arr,uint16_t psc)
+    void TIM_Mode_Config(void)
     {
+        TIM_IC_InitTypeDef TIM_IC_Config;
         GPIO_InitTypeDef  GPIO_InitStructure;
-        TIM_IC_InitTypeDef sConfigIC;
-        //使能TIM时钟
+    
         TPAD_TIM_CLK_ENABLE();
-        //使能通道引脚时钟
         TPAD_TIM_GPIO_CLK_ENABLE();
+    
         //端口配置
         GPIO_InitStructure.Pin = TPAD_TIM_CH_PIN;
         //复用功能
         GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
-        GPIO_InitStructure.Alternate = TPAD_TIM_AF;
-        GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
+        GPIO_InitStructure.Alternate = TPAD_TIMx_AF;
+        GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_HIGH;
         //不带上下拉
         GPIO_InitStructure.Pull = GPIO_NOPULL;
         HAL_GPIO_Init(TPAD_TIM_CH_PORT, &GPIO_InitStructure);
-        //初始化TIM
-        //设定计数器自动重装值
+    
         TIM_Handle.Instance = TPAD_TIMx;
-        TIM_Handle.Init.Prescaler = psc;
-        TIM_Handle.Init.CounterMode = TIM_COUNTERMODE_UP;
         TIM_Handle.Init.RepetitionCounter = 0;
-        TIM_Handle.Init.Period = arr;
+    
         TIM_Handle.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+        TIM_Handle.Init.CounterMode = TIM_COUNTERMODE_UP;
+        TIM_Handle.Init.Period = TPAD_ARR_MAX_VAL;
+        //设定定时器预分频器目标时钟为：9MHz(200Mhz/22)
+        TIM_Handle.Init.Prescaler = 23 - 1;
+    
         HAL_TIM_IC_Init(&TIM_Handle);
-        //上升沿触发
-        sConfigIC.ICPolarity = TIM_INPUTCHANNELPOLARITY_RISING;
-        // 输入捕获选择
-        sConfigIC.ICSelection = TIM_ICSELECTION_DIRECTTI;
-        //配置输入分频,不分频
-        sConfigIC.ICPrescaler = TIM_ICPSC_DIV1;
-        //配置输入滤波器 不滤波
-        sConfigIC.ICFilter = 0;
-        //初始化捕获通道
-        HAL_TIM_IC_ConfigChannel(&TIM_Handle, &sConfigIC, TPAD_TIM_Channel_X);
+    
+        TIM_IC_Config.ICFilter = 0;
+        TIM_IC_Config.ICPolarity = TIM_ICPOLARITY_RISING;
+        TIM_IC_Config.ICPrescaler = TIM_ICPSC_DIV1;
+        TIM_IC_Config.ICSelection = TIM_ICSELECTION_DIRECTTI;
+        HAL_TIM_IC_ConfigChannel(&TIM_Handle, &TIM_IC_Config, TPAD_TIM_Channel_X);
+    
         //启动TIM
         HAL_TIM_IC_Start(&TIM_Handle, TPAD_TIM_Channel_X);
     }
@@ -185,7 +184,7 @@ TIM—电容按键检测
 
 然后，配置定时器功能。定时器周期和预分频器值由函数形参决定，采用向上计数方式。指定输入捕获通道，电容按键检测需要采用上升沿触发方式。
 
-最后，启动定时器。
+最后，调用HAL_TIM_IC_Start函数启动定时器。
 
 电容按键复位
 =====================
@@ -200,16 +199,15 @@ TIM—电容按键检测
         //配置引脚为普通推挽输出
         GPIO_InitStructure.Pin = TPAD_TIM_CH_PIN;
         GPIO_InitStructure.Mode = GPIO_MODE_OUTPUT_PP;
-        GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
+        GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_HIGH;
         GPIO_InitStructure.Pull = GPIO_PULLDOWN;
         HAL_GPIO_Init(TPAD_TIM_CH_PORT, &GPIO_InitStructure);
-
+    
         //输出低电平,放电
-        HAL_GPIO_WritePin ( TPAD_TIM_CH_PORT,
-        TPAD_TIM_CH_PIN ,GPIO_PIN_RESET);
+        HAL_GPIO_WritePin(TPAD_TIM_CH_PORT, TPAD_TIM_CH_PIN ,GPIO_PIN_RESET);
         //保持一小段时间低电平，保证放电完全
         HAL_Delay(5);
-
+    
         //清除更新标志
         __HAL_TIM_CLEAR_FLAG(&TIM_Handle,TIM_FLAG_CC1);
         __HAL_TIM_CLEAR_FLAG(&TIM_Handle,TIM_FLAG_UPDATE);
@@ -218,15 +216,15 @@ TIM—电容按键检测
         //引脚配置为复用功能，不上、下拉
         GPIO_InitStructure.Pin = TPAD_TIM_CH_PIN;
         GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
-        GPIO_InitStructure.Alternate = TPAD_TIM_AF;
-        GPIO_InitStructure.Speed = GPIO_SPEED_HIGH;
+        GPIO_InitStructure.Alternate = TPAD_TIMx_AF;
+        GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_HIGH;
         GPIO_InitStructure.Pull = GPIO_NOPULL;
         HAL_GPIO_Init(TPAD_TIM_CH_PORT,&GPIO_InitStructure);
     }
 
 该函数实现两个主要功能：控制电容按键放电和复位计数器。
 
-首先，配置定时器通道引脚作为普通GPIO，使其为下拉的推挽输出模式。然后调用HAL_GPIO_WritePin函数输出低电平，为保证放电完整，需要延时一小会时间，这里调用HAL_Delay函数完成5毫秒的延时。HAL_Delay函数是定义在STM32F4xx_hal.c文件的一个延时函数，它利用系统滴答定时器功能实现毫秒级的精准延时。这个函数再初始化时钟的时候默认已经初始化，可以随时调用。
+首先，配置定时器通道引脚作为普通GPIO，使其为下拉的推挽输出模式。然后调用HAL_GPIO_WritePin函数输出低电平，为保证放电完整，需要延时一小会时间，这里调用HAL_Delay函数完成5毫秒的延时。HAL_Delay函数是定义在stm32h7xx_hal.c文件的一个延时函数，它利用系统滴答定时器功能实现毫秒级的精准延时。这个函数再初始化时钟的时候默认已经初始化，可以随时调用。
 
 这里还需要一个注意的地方，在控制电容按键放电的整个过程定时器是没有停止的，计数器还是在不断向上计数的，只是现阶段计数值对我们来说没有意义而已。
 
@@ -334,12 +332,11 @@ TPAD_Get_Val函数用来获取一次电容按键捕获值，包括电容按键�
 
 该函数实现定时器初始化配置和无触摸时电容按键捕获值确定功能。它一般在main函数靠前位置调用完成电容按键初始化功能。
 
-程序先调用TIMx_CHx_Cap_Init函数完成定时器基本初始化和输入捕获功能配置，两个参数用于设置定时器的自动重载计数和定时器时钟频率，这里自动重载计数被赋值为TPAD_ARR_MAX_VAL，这里对该值没有具体要求，不要设置过低即可。定时器时钟配置设置为9MHz为合适，实验中用到TIM2，默认使用内部时钟为216MHz，经过参数设置预分频器为24分频，使定时器时钟为9MHz。
+程序先调用TIM_Mode_Config函数完成定时器基本初始化和输入捕获功能配置，两个参数用于设置定时器的自动重载计数和定时器时钟频率，这里自动重载计数被赋值为TPAD_ARR_MAX_VAL，这里对该值没有具体要求，不要设置过低即可。定时器时钟配置设置为9MHz为合适，实验中用到TIM2，默认使用内部时钟为200MHz，经过参数设置预分频器为23分频，使定时器时钟约等于9MHz。
 
 接下来，循环10次读取电容按键捕获值，并保存在数组内。TPAD_Init函数一般在开机时被调用，所以认为10次读取到的捕获值都是无触摸状态下的捕获值。
 
-然后，对10个捕获值从小到大排序，取中间6个的平均数作为无触摸状态下的参考捕获值，
-并保存在tpad_default_val变量中，该值对应 图32_4_ 中的时间t1。
+然后，对10个捕获值从小到大排序，取中间6个的平均数作为无触摸状态下的参考捕获值，并保存在tpad_default_val变量中，该值对应 图32_4_ 中的时间t1。
 
 程序最后会检测tpad_default_val变量的合法性。
 
@@ -409,15 +406,16 @@ main函数
 
     int main(void)
     {
-        /* 系统时钟初始化成216 MHz */
+    
+        /* 系统时钟初始化成400MHz */
         SystemClock_Config();
+    
         /*串口初始化 */
-        UARTx_Config();
+        DEBUG_USART_Config();
         /*蜂鸣器端口初始化 */
         BEEP_GPIO_Config();
         /* 初始化电容按键 */
         TPAD_Init();
-        /* 控制IO */
         while (1) {
             if (TPAD_Scan(0)) {
                 BEEP_ON;

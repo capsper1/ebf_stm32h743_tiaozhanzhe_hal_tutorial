@@ -38,13 +38,12 @@ FatFs移植步骤
    :alt: 图 36‑3 添加FatFs路径到工程
    :name: 图36_3
 
-操作到这来，工程文件结构就算完整了，接下来就是修改文件代码了。这来有两个文件需要修改，为diskio.c文件和main.c文件。main.c文件内容可以
-参考“SPI—FatFs移植与读写测试”工程中的main.c文件，只有做小细节修改而已。这来重点讲解diskio.c文件，也是整个移植的重点。
+操作到这来，工程文件结构就算完整了，接下来就是修改文件代码了。这来有两个文件需要修改，为fatfs_sd_sdio.c文件和main.c文件。main.c文件内容可以参考“QSPI—FatFs移植与读写测试”工程中的main.c文件，只有做小细节修改而已。这来重点讲解fatfs_sd_sdio.c文件，也是整个移植的重点。
 
 FatFs接口函数
 ~~~~~~~~~~~~~
 
-FatFs文件系统与存储设备的连接函数在sd_diskio.c文件中，主要有5个函数需要我们编写的。
+FatFs文件系统与存储设备的连接函数在fatfs_sd_sdio.c文件中，主要有5个函数需要我们编写的。
 
 宏定义和存储设备状态获取函数
 '''''''''''''''''''''''''''''''''''
@@ -56,14 +55,13 @@ FatFs文件系统与存储设备的连接函数在sd_diskio.c文件中，主要�
 
     DSTATUS SD_status(BYTE lun)
     {
-        Stat = STA_NOINIT;
 
-        if (BSP_SD_GetStatus() == MSD_OK) {
+        Stat = STA_NOINIT;
+        if (HAL_SD_GetCardState(&uSdHandle) == HAL_SD_CARD_TRANSFER) {
             Stat &= ~STA_NOINIT;
         }
-
         return Stat;
-    }
+    } 
 
 SD_status函数要求返回存储设备的当前状态，对于SD卡一般返回SD卡插入状态，这里直接返回正常状态。
 
@@ -78,12 +76,9 @@ SD_status函数要求返回存储设备的当前状态，对于SD卡一般返回
     DSTATUS SD_initialize(BYTE lun)
     {
         Stat = STA_NOINIT;
-
-        /* Configure the uSD device */
-        if (BSP_SD_Init() == MSD_OK) {
+        if (BSP_SD_Init() == HAL_OK) {
             Stat &= ~STA_NOINIT;
         }
-
         return Stat;
     }
 
@@ -97,78 +92,115 @@ SD_status函数要求返回存储设备的当前状态，对于SD卡一般返回
 .. code-block:: c
    :name: 代码清单36_3
 
-    DRESULT SD_read(BYTE lun, BYTE *buff, DWORD sector, UINT count)
+    DRESULT SD_read(BYTE lun,
+                    BYTE *buff,
+                    DWORD sector, 
+                    UINT count)
     {
-        DRESULT res = RES_OK;
+        DRESULT res = RES_ERROR;
+        uint32_t timeout;
+        uint32_t alignedAddr;
 
-        if ((DWORD)buff & 3) {
-            DWORD scratch[BLOCK_SIZE / 4];
+        RX_Flag = 0;
 
-            while (count--) {
-                memcpy(scratch, buff, BLOCK_SIZE);
-                res = SD_read(lun,(void *)scratch, sector++, 1);
+        alignedAddr = (uint32_t)buff & ~0x1F;
+        SCB_CleanDCache_by_Addr((uint32_t*)alignedAddr, count*BLOCKSIZE + ((uint32_t)buff - alignedAddr));
+        if (HAL_SD_ReadBlocks_DMA(&uSdHandle, (uint8_t*)buff,
+                                (uint32_t) (sector),
+                                count) == HAL_OK) {
+            /* Wait that the reading process is completed or a timeout occurs 
 
-                if (res != RES_OK) {
-                    break;
-                }
-                buff += BLOCK_SIZE;
+            timeout = HAL_GetTick();
+            while ((RX_Flag == 0) && ((HAL_GetTick() - timeout) < SD_TIMEOUT)) 
+
             }
+            /* incase of a timeout return error */
+            if (RX_Flag == 0) {
+                res = RES_ERROR;
+            } else {
+                RX_Flag = 0;
+                timeout = HAL_GetTick();
 
-            return (res);
-        }
-        if (BSP_SD_ReadBlocks_DMA((uint32_t*)buff,
-                            (uint64_t) (sector * BLOCK_SIZE),
-                            BLOCK_SIZE,
-                            count) != MSD_OK) {
-            res = RES_ERROR;
+                while ((HAL_GetTick() - timeout) < SD_TIMEOUT) {
+                    if (HAL_SD_GetCardState(&uSdHandle) == HAL_SD_CARD_TRANSFER) {
+                        res = RES_OK;
+
+        /*
+            the SCB_InvalidateDCache_by_Addr() requires a 32-Byte aligned address,
+            adjust the address and the D-Cache size to invalidate accordingly.
+        */
+                        alignedAddr = (uint32_t)buff & ~0x1F;
+                        SCB_InvalidateDCache_by_Addr((uint32_t*)alignedAddr, count*BLOCKSIZE + ((uint32_t)buff - alignedAddr));
+                        break;
+                    }
+                }
+            }
         }
 
         return res;
-    }
+    } 
 
-SD_read函数用于从存储设备指定地址开始读取一定的数量的数据到指定存储区内。对于SD卡，最重要是使用BSP_SD_ReadBlocks_DMA函数读取多块数据到存储区。这里需要注意的地方是SD卡数据操作是使用DMA传输的，并设置数据尺寸为32位大小，为实现数据正确传输，要求存储区是4字节对齐。在某些情况下，FatFs提供的buff地址不是4字节对齐，这会导致DMA数据传输失败，所以为保证数据传输正确，可以先判断存储区地址是否是4字节对齐，如果存储区地址已经是4字节对齐，无需其他处理，直接使用BSP_SD_ReadBlocks_DMA函数执行多块读取即可。如果判断得到地址不是4字节对齐，则先申请一个4字节对齐的临时缓冲区，即局部数组变量scratch，通过定义为DWORD类型可以使得其自动4字节对齐，scratch所占的总存储空间也是一个块大小，这样把一个块数据读取到scratch内，然后把scratch存储器内容拷贝到buff地址空间上就可以了。
+SD_read函数用于从存储设备指定地址开始读取一定的数量的数据到指定存储区内。对于SD卡，最重要是使用HAL_SD_ReadBlocks_DMA函数读取多块数据到存储区。这里需要注意的地方是SD卡数据操作是使用DMA传输的，为实现数据正确传输，读取数据之前，需要更新相应的DCache，数据的指针应该满足4字节对齐。
 
-BSP_SD_ReadBlocks_DMA函数用于从SD卡内读取多个块数据，它有四个形参，分别为存储区地址指针、起始块地址、块大小以及块数量。
+HAL_SD_ReadBlocks_DMA函数用于从SD卡内读取多个块数据，它有四个形参，分别为外设管理结构体、存储区地址指针、起始块地址以及块数量。
 
 存储设备数据写入函数
 ''''''''''''''''''''''''
 
-代码清单 36‑4 disk_write函数
+代码清单 36‑4 disk_write函数（文件fatfs_sd_sdio.c）
 
 .. code-block:: c
    :name: 代码清单36_4
 
-    DRESULT SD_write(BYTE lun, const BYTE *buff, DWORD sector, UINT count)
+    DRESULT SD_write(BYTE lun,
+                    const BYTE *buff,
+                    DWORD sector, 
+                    UINT count)
     {
-        DRESULT res = RES_OK;
+        DRESULT res = RES_ERROR;
+        uint32_t timeout;
+        uint32_t alignedAddr;
 
-        if ((DWORD)buff & 3) {
-            DWORD scratch[BLOCK_SIZE / 4];
+        TX_Flag = 0;
+        alignedAddr = (uint32_t)buff & ~0x1F;
+        SCB_CleanDCache_by_Addr((uint32_t*)alignedAddr, count*BLOCKSIZE + ((uint32_t)buff - alignedAddr));
+        if (HAL_SD_WriteBlocks_DMA(&uSdHandle, (uint8_t*)buff,
+                                (uint32_t) (sector),
+                                count) == HAL_OK) {
+            /* Wait that the reading process is completed or a timeout occurs */
 
-            while (count--) {
-                memcpy(scratch, buff, BLOCK_SIZE);
-                res = SD_write(lun,(void *)scratch, sector++, 1);
-
-                if (res != RES_OK) {
-                    break;
-                }
-                buff += BLOCK_SIZE;
+            timeout = HAL_GetTick();
+            while ((TX_Flag == 0) && ((HAL_GetTick() - timeout) < SD_TIMEOUT)) 
+            {
             }
+            /* incase of a timeout return error */
+            if (TX_Flag == 0) {
+                res = RES_ERROR;
+            } else {
+                TX_Flag = 0;
+                timeout = HAL_GetTick();
 
-            return (res);
+                while ((HAL_GetTick() - timeout) < SD_TIMEOUT) {
+                    if (HAL_SD_GetCardState(&uSdHandle) == HAL_SD_CARD_TRANSFER) {
+                        res = RES_OK;
+            /*
+            the SCB_InvalidateDCache_by_Addr() requires a 32-Byte aligned address,
+            adjust the address and the D-Cache size to invalidate accordingly.
+            */
+                        SCB_InvalidateDCache_by_Addr((uint32_t*)alignedAddr, count*BLOCKSIZE + ((uint32_t)buff - alignedAddr));
+                                                    
+    
+                        break;
+                    }
+                }
+            }
         }
-        if (BSP_SD_WriteBlocks_DMA((uint32_t*)buff,
-                            (uint64_t)(sector * BLOCK_SIZE),
-                            BLOCK_SIZE, count) != MSD_OK) {
-            res = RES_ERROR;
-        }
-
         return res;
-    }
+    } 
 
-SD_write函数用于向存储设备指定地址写入指定数量的数据。对于SD卡，执行过程与SD_read函数是非常相似，也必须先检测存储区地址是否是4字节对齐，如果是4字节对齐则直接调用BSP_SD_WriteBlocks_DMA函数完成多块数据写入操作。如果不是4字节对齐，申请一个4字节对齐的临时缓冲区，先把待写入的数据拷贝到该临时缓冲区内，然后才写入到SD卡。
+SD_write函数用于向存储设备指定地址写入指定数量的数据。对于SD卡，执行过程与SD_read函数是非常相似，也必须先更新相应的DCache，判断存储区地址是否是4字节对齐。
 
-BSP_SD_WriteBlocks_DMA函数是向SD卡写入多个块数据，它有四个形参，分别为存储区地址指针、起始块地址、块大小以及块数量，它与BSP_SD_ReadBlocks_DMA函数执行相互过程。最后也是需要使用相关函数保存数据写入完整才退出SD_write函数。
+HAL_SD_WriteBlocks_DMA函数是向SD卡写入多个块数据，它有四个形参，分别为外设管理结构体、存储区地址指针、起始块地址以及块数量，它与BSP_SD_ReadBlocks_DMA函数执行相互过程。最后也是需要使用相关函数保存数据写入完整才退出SD_write函数。
 
 其他控制函数
 '''''''''''''''
@@ -178,50 +210,51 @@ BSP_SD_WriteBlocks_DMA函数是向SD卡写入多个块数据，它有四个形�
 .. code-block:: c
    :name: 代码清单36_5
 
-    DRESULT SD_ioctl(BYTE lun, BYTE cmd, void *buff)
+    DRESULT SD_ioctl(BYTE lun,BYTE cmd, void *buff)
     {
         DRESULT res = RES_ERROR;
-        SD_CardInfo CardInfo;
-
+        HAL_SD_CardInfoTypeDef CardInfo;
+    
         if (Stat & STA_NOINIT) return RES_NOTRDY;
-
+    
         switch (cmd) {
         /* Make sure that no pending write process */
         case CTRL_SYNC :
             res = RES_OK;
             break;
-
+    
         /* Get number of sectors on the disk (DWORD) */
         case GET_SECTOR_COUNT :
-            BSP_SD_GetCardInfo(&CardInfo);
-            *(DWORD*)buff = CardInfo.CardCapacity / BLOCK_SIZE;
+            HAL_SD_GetCardInfo(&uSdHandle, &CardInfo);
+            *(DWORD*)buff = CardInfo.LogBlockNbr;
             res = RES_OK;
             break;
-
+    
         /* Get R/W sector size (WORD) */
         case GET_SECTOR_SIZE :
-            *(WORD*)buff = BLOCK_SIZE;
+            HAL_SD_GetCardInfo(&uSdHandle, &CardInfo);
+            *(WORD*)buff = CardInfo.LogBlockSize;
             res = RES_OK;
             break;
-
+    
         /* Get erase block size in unit of sector (DWORD) */
         case GET_BLOCK_SIZE :
-            *(DWORD*)buff = BLOCK_SIZE;
+            HAL_SD_GetCardInfo(&uSdHandle, &CardInfo);
+            *(DWORD*)buff = CardInfo.LogBlockSize / BLOCK_SIZE;
+            res = RES_OK;
             break;
-
+    
         default:
             res = RES_PARERR;
         }
-
-        return res;
+        return RES_OK;
     }
 
 SD_ioctl函数有三个形参，lun为设备物理编号，cmd为控制指令，包括发出同步信号、获取扇区数目、获取扇区大小、获取擦除块数量等等指令，buff为指令对应的数据指针。
 
 对于SD卡，为支持格式化功能，需要用到获取扇区数量(GET_SECTOR_COUNT)指令和获取块尺寸(GET_BLOCK_SIZE)。另外，SD卡扇区大小为512字节，串行Flash芯片一般设置扇区大小为4096字节，所以需要用到获取扇区大小(GET_SECTOR_SIZE)指令。
 
-至此，基于SD卡的FatFs文件系统移植就已经完成了，最重要就是sd_diskio.c文件中5个函数的编写。接下来就编写FatFs基本的文件操作检测移植代码是否可以正确执行。
-
+至此，基于SD卡的FatFs文件系统移植就已经完成了，最重要就是fatfs_sd_sdio.c文件中5个函数的编写。接下来就编写FatFs基本的文件操作检测移植代码是否可以正确执行。
 
 FatFs功能测试
 ~~~~~~~~~~~~~
@@ -267,32 +300,29 @@ buffer和textFileBuffer分别对应读取和写入数据缓存区，都是8位�
 
     int main(void)
     {
-        /* 配置系统时钟为216 MHz */
+        /* 系统时钟初始化成400MHz */
         SystemClock_Config();
-        /* 使能指令缓存 */
-        SCB_EnableICache();
-        /* 使能数据缓存 */
-        SCB_EnableDCache();
-        /*禁用WiFi模块*/
-        WIFI_PDN_INIT();
-        /* 初始化LED */
+    
+        CPU_CACHE_Enable();
+    
         LED_GPIO_Config();
         LED_BLUE;
-        /* 初始化调试串口，一般为串口1 */
-        UARTx_Config();
-        printf("****** 这是一个SD卡文件系统实验 ******\r\n");
+        /* 初始化USART1 配置模式为 115200 8-N-1 */
+        DEBUG_USART_Config();
+        /* 初始化独立按键 */
+        printf("***** * 这是一个SD卡文件系统实验 ******\r\n");
         //链接驱动器，创建盘符
         FATFS_LinkDriver(&SD_Driver, SDPath);
         //在外部SD卡挂载文件系统，文件系统挂载时会对SD卡初始化
         res_sd = f_mount(&fs,"0:",1);
-
+    
         /*----------------------- 格式化测试 ---------------------------*/
         /* 如果没有文件系统就格式化创建创建文件系统 */
         if (res_sd == FR_NO_FILESYSTEM) {
             printf("》SD卡还没有文件系统，即将进行格式化...\r\n");
             /* 格式化 */
             res_sd=f_mkfs("0:",0,0);
-
+    
             if (res_sd == FR_OK) {
                 printf("》SD卡已成功格式化文件系统。\r\n");
                 /* 格式化后，先取消挂载 */
@@ -311,11 +341,11 @@ buffer和textFileBuffer分别对应读取和写入数据缓存区，都是8位�
         } else {
             printf("》文件系统挂载成功，可以进行读写测试\r\n");
         }
-
-        /*----------------------- 文件系统测试：写测试--------------------------*/
+    
+    /*----------------------- 文件系统测试：写测试 -----------------------------*/
         /* 打开文件，如果文件不存在则创建它 */
-        printf("\r\n****** 即将进行文件写入测试... ******\r\n");
-    res_sd = f_open(&fnew, "0:FatFs读写测试文件.txt",FA_CREATE_ALWAYS | FA_WRITE );
+        printf("\r\n***** * 即将进行文件写入测试... ******\r\n");
+        res_sd = f_open(&fnew, "0:FatFs读写测试文件.txt",FA_CREATE_ALWAYS | FA_WRITE );
         if ( res_sd == FR_OK ) {
             printf("》打开/创建FatFs读写测试文件.txt文件成功，向文件写入数据。\r\n");
             /* 将指定存储区内容写入到文件内 */
@@ -332,8 +362,8 @@ buffer和textFileBuffer分别对应读取和写入数据缓存区，都是8位�
             LED_RED;
             printf("！！打开/创建文件失败。\r\n");
         }
-
-        /*------------------- 文件系统测试：读测试 ---------------------------*/
+    
+        /*------------------- 文件系统测试：读测试 ----------------------------------*/
         printf("****** 即将进行文件读取测试... ******\r\n");
         res_sd = f_open(&fnew, "0:FatFs读写测试文件.txt", FA_OPEN_EXISTING | FA_READ);
         if (res_sd == FR_OK) {
@@ -352,10 +382,10 @@ buffer和textFileBuffer分别对应读取和写入数据缓存区，都是8位�
         }
         /* 不再读写，关闭文件 */
         f_close(&fnew);
-
+    
         /* 不再使用文件系统，取消挂载文件系统 */
         f_mount(NULL,"0:",1);
-
+    
         /* 操作完成，停机 */
         while (1) {
         }

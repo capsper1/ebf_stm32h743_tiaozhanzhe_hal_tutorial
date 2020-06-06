@@ -1,11 +1,11 @@
 TIM—基本定时器
 --------------
 
-本章参考资料：《STM32H74xxx参考手册》、《STM32F7xx规格书》、库帮助文档《STM32F779xx_User_Manual.chm》。
+本章参考资料：《STM32H743用户手册》、《STM32H743xI规格书》、库帮助文档《STM32H753xx_User_Manual.chm》。
 
-学习本章时，配合《STM32H74xxx参考手册》基本定时器章节一起阅读，效果会更佳，特别是涉及到寄存器说明的部分。
+学习本章时，配合《STM32H743用户手册》基本定时器章节一起阅读，效果会更佳，特别是涉及到寄存器说明的部分。
 
-特别说明，本书内容是以STM32H743x系列控制器资源讲解。
+特别说明，本书内容是以STM32H743系列控制器资源讲解。
 
 TIM简介
 ~~~~~~~
@@ -24,9 +24,9 @@ STM32H743控制器有2个高级控制定时器、10个通用定时器和2个基�
    :align: center
    :alt: 表 31‑1 各个定时器特性
 
-其中最大定时器时钟可通过RCC_DCKCFGR寄存器配置为108MHz或者216MHz。
+其中最大定时器时钟可通过RCC_CFGR寄存器配置为100MHz或者400MHz。
 
-定时器功能强大，这一点透过《STM32F7xx中文参考手册》讲解定时器内容就有160多页就显而易见了。定时器篇幅长，内容多，对于新手想完全掌握确实有些难度，特别参考手册是先介绍高级控制定时器，然后介绍通用定时器，最后才介绍基本定时器。实际上，就功能上来说通用定时器包含所有基本定时器功能，而高级控制定时器包含通用定时器所有功能。所以高级控制定时器功能繁多，但也是最难理解的，本章我们先选择最简单的基本定时器进行讲解。
+定时器功能强大，这一点透过《STM32H743用户手册》讲解定时器内容就有160多页就显而易见了。定时器篇幅长，内容多，对于新手想完全掌握确实有些难度，特别参考手册是先介绍高级控制定时器，然后介绍通用定时器，最后才介绍基本定时器。实际上，就功能上来说通用定时器包含所有基本定时器功能，而高级控制定时器包含通用定时器所有功能。所以高级控制定时器功能繁多，但也是最难理解的，本章我们先选择最简单的基本定时器进行讲解。 
 
 基本定时器
 ~~~~~~~~~~
@@ -62,10 +62,9 @@ STM32H743控制器有2个高级控制定时器、10个通用定时器和2个基�
 
 定时器要实现计数必须有个时钟源，基本定时器时钟只能来自内部时钟，高级控制定时器和通用定时器还可以选择外部时钟源或者直接来自其他定时器等待模式。
 我们可以通过RCC专用时钟配置寄存器(RCC_DCKCFGR)的TIMPRE位设置所有定时器的时钟频率，我们一般设置该位为默认值0，
-使得 表31_1_ 中可选的最大定时器时钟为108MHz，即基本定时器的内部时钟(CK_INT)频率为108MHz。
+使得 表31_1_ 其中最大定时器时钟可通过RCC_CFGR寄存器配置为100MHz或者400MHz。
 
-基本定时器只能使用内部时钟，当TIM6和TIM7控制寄存器1(TIMx_CR1)的CEN位置1时，启动基本定时器，并且预分频器的时钟来源就是CK_INT。
-对于高级控制定时器和通用定时器的时钟源可以来找控制器外部时钟、其他定时器等等模式，较为复杂，我们在相关章节会详细介绍。
+基本定时器只能使用内部时钟，当TIM6和TIM7控制寄存器1(TIMx_CR1)的CEN位置1时，启动基本定时器，并且预分频器的时钟来源就是CK_INT。对于高级控制定时器和通用定时器的时钟源可以来找控制器外部时钟、其他定时器等等模式，较为复杂，我们在相关章节会详细介绍。
 
 ②控制器
 '''''''
@@ -101,7 +100,7 @@ STM32H743控制器有2个高级控制定时器、10个通用定时器和2个基�
 
 经过上面分析，我们知道定时事件生成时间主要由TIMx_PSC和TIMx_ARR两个寄存器值决定，这个也就是定时器的周期。比如我们需要一个1s周期的定时器，具体这两个寄存器值该如何设置内。假设，我们先设置TIMx_ARR寄存器值为9999，即当TIMx_CNT从0开始计算，刚好等于9999时生成事件，总共计数10000次，那么如果此时时钟源周期为100us即可得到刚好1s的定时周期。
 
-接下来问题就是设置TIMx_PSC寄存器值使得CK_CNT输出为100us周期(10000Hz)的时钟。预分频器的输入时钟CK_PSC为90MHz，所以设置预分频器值为(9000-1)即可满足。
+接下来问题就是设置TIMx_PSC寄存器值使得CK_CNT输出为100us周期(10000Hz)的时钟。预分频器的输入时钟CK_PSC为200MHz，所以设置预分频器值为(20000-1)即可满足。
 
 定时器初始化结构体详解
 ~~~~~~~~~~~~~~~~~~~~~~
@@ -110,32 +109,59 @@ HAL库函数对定时器外设建立了四个初始化结构体，基本定时�
 
 初始化结构体和初始化库函数配合使用是HAL库精髓所在，理解了初始化结构体每个成员意义基本上就可以对该外设运用自如了。初始化结构体定义在STM32F7xx_hal_tim.h文件中，初始化库函数定义在STM32F7xx_hal_tim.c文件中，编程时我们可以结合这两个文件内注释使用。
 
-代码清单 31‑1 定时器基本初始化结构体
+代码清单 31.1 定时器外设管理结构体（stm32h7xx_hal_tim.h文件）
 
 .. code-block:: c
    :name: 代码31_1
 
     typedef struct {
-        uint16_t Prescaler;          // 预分频器
-        uint16_t CounterMode;        // 计数模式
-        uint32_t Period;             // 定时器周期
-        uint16_t ClockDivision;      // 时钟分频
-        uint8_t  RepetitionCounter;   // 重复计算器
-    } TIM_Base_InitTypeDef;
+        TIM_TypeDef              *Instance; /*!< 外设寄存器基地址 */
+        TIM_Base_InitTypeDef     Init;   /*!< 定时器时基单元初始化结构体 */
+        HAL_TIM_ActiveChannel    Channel;  /*!< TIM通道x */
+        DMA_HandleTypeDef        *hdma[7]; /*!< DMA外设管理结构体 */
+        HAL_LockTypeDef          Lock;     /*!< 锁资源 */
+        __IO HAL_TIM_StateTypeDef   State; /*!< TIM工作状态 */
+    } TIM_HandleTypeDef;
 
-(1) Prescaler：定时器预分频器设置，时钟源经该预分频器才是定时器时钟，
-    它设定TIMx_PSC寄存器的值。可设置范围为0至65535，实现1至65536分频。
+(1)	Instance：TIM寄存器基地址指针，所有参数都是指定基地址后才能正确写入寄存器。
 
-(2) CounterMode：定时器计数方式，可是在为向上计数、向下计数以及三种中心对齐模式。
-    基本定时器只能是向上计数，即TIMx_CNT只能从0开始递增，并且无需初始化。
+(2)	Init：TIM时基单元初始化结构体，下面会详细讲解每一个成员。
 
-(3) Period：定时器周期，实际就是设定自动重载寄存器的值，在事件生成时更新到影子寄存器。可设置范围为0至65535。
+(3)	Channel：TIMx的通道，可以选择HAL_TIM_ACTIVE_CHANNEL_1~HAL_TIM_ACTIVE_CHANNEL_6。
 
-(4) ClockDivision：时钟分频，设置定时器时钟CK_INT频率与数字滤波器采样时钟频率分频比，基本定时器没有此功能，不用设置。
+(4)	DMA_Handle：DMA外设管理结构体，用来配置TIM的DMA请求。
 
-(5) RepetitionCounter：重复计数器，属于高级控制寄存器专用寄存器位，利用它可以非常容易控制输出PWM的个数。这里不用设置。
+(5)	Lock：ADC锁资源。
 
-虽然定时器基本初始化结构体有5个成员，但对于基本定时器只需设置其中两个就可以，想想使用基本定时器就是简单。
+(6)	State：TIM的工作状态。有HAL_TIM_STATE_READY，HAL_TIM_STATE_BUSY，HAL_TIM_STATE_TIMEOUT和HAL_TIM_STATE_ERROR等工作状态，方便用户排除错误。
+
+代码清单 31.1.1 定时器基本初始化结构体
+
+.. code-block:: c
+   :name: 代码31_1_1
+
+    typedef struct {
+        uint32_t Prescaler;         /*!< 预分频器 */
+        uint32_t CounterMode;       /*!< 计数模式 */
+        uint32_t Period;            /*!< 定时器周期*/
+        uint32_t ClockDivision;     /*!< 时钟分频 */
+        uint32_t RepetitionCounter;  /*!< 重复计数器 */
+        uint32_t AutoReloadPreload;  /*!< 自动重装载寄存器的值 */
+    } TIM_Base_InitTypeDef; 
+
+(1)	Prescaler：定时器预分频器设置，时钟源经该预分频器才是定时器时钟，它设定TIMx_PSC寄存器的值。可设置范围为0至65535，实现1至65536分频。
+
+(2)	CounterMode：定时器计数方式，可是在为向上计数、向下计数以及三种中心对齐模式。基本定时器只能是向上计数，即TIMx_CNT只能从0开始递增，并且无需初始化。
+
+(3)	Period：定时器周期，实际就是设定自动重载寄存器的值，在事件生成时更新到影子寄存器。可设置范围为0至65535。
+
+(4)	ClockDivision：时钟分频，设置定时器时钟CK_INT频率与数字滤波器采样时钟频率分频比，基本定时器没有此功能，不用设置。
+
+(5)	RepetitionCounter：重复计数器，属于高级控制寄存器专用寄存器位，利用它可以非常容易控制输出PWM的个数。这里不用设置。
+
+(6)	AutoReloadPreload：自动重装载计数器的值。当ARPE位置0时，自动重装载计算器的值会立刻生效。
+
+虽然定时器基本初始化结构体有6个成员，但对于基本定时器只需设置其中两个（时钟分频以及定时器周期）就可以，想想使用基本定时器就是简单。
 
 基本定时器定时实验
 ~~~~~~~~~~~~~~~~~~
@@ -197,16 +223,15 @@ NCIV配置
    :name: 代码31_3
 
     /**
-    * @brief  基本定时器 TIMx,x[6,7]中断优先级配置
+    * @brief  初始化基本定时器定时，1ms产生一次中断
     * @param  无
     * @retval 无
     */
-    static void TIMx_NVIC_Configuration(void)
+    void TIM_Basic_Init(void)
     {
-        //设置抢占优先级，子优先级
-        HAL_NVIC_SetPriority(BASIC_TIM_IRQn, 0, 3);
-        // 设置中断来源
-        HAL_NVIC_EnableIRQ(BASIC_TIM_IRQn);
+        TIMx_Configuration();
+
+        TIMx_NVIC_Configuration();
     }
 
 实验用到定时器更新中断，需要配置NVIC，实验只有一个中断，对NVIC配置没什么具体要求。
@@ -219,56 +244,61 @@ NCIV配置
 .. code-block:: c
    :name: 代码31_4
 
-    static void TIM_Mode_Config(void)
+    static void TIMx_Configuration(void)
     {
-        // 开启TIMx_CLK,x[6,7]
         BASIC_TIM_CLK_ENABLE();
-
-        TIM_TimeBaseStructure.Instance = BASIC_TIM;
+    
+        TIM_Base.Instance = BASIC_TIM;
         /* 累计 TIM_Period个后产生一个更新或者中断*/
         //当定时器从0计数到4999，即为5000次，为一个定时周期
-        TIM_TimeBaseStructure.Init.Period = 5000-1;
-
+        TIM_Base.Init.Period = 5000 - 1;
         //定时器时钟源TIMxCLK = 2 * PCLK1
         //        PCLK1 = HCLK / 4
-        //        => TIMxCLK=HCLK/2=SystemCoreClock/2=108MHz
+        //        => TIMxCLK=HCLK/2=SystemCoreClock/2=200MHz
         // 设定定时器频率为=TIMxCLK/(TIM_Prescaler+1)=10000Hz
-        TIM_TimeBaseStructure.Init.Prescaler = 10800-1;
-
-        // 初始化定时器TIMx, x[2,3,4,5]
-        HAL_TIM_Base_Init(&TIM_TimeBaseStructure);
-
+        TIM_Base.Init.Prescaler =  20000 - 1;
+        // 初始化定时器TIM
+        HAL_TIM_Base_Init(&TIM_Base);
         // 开启定时器更新中断
-        HAL_TIM_Base_Start_IT(&TIM_TimeBaseStructure);
+        HAL_TIM_Base_Start_IT(&TIM_Base);
     }
 
 使用定时器之前都必须开启定时器时钟，基本定时器属于APB1总线外设。
 
-接下来设置定时器周期数为4999，即计数5000次生成事件。设置定时器预分频器为(10800-1)，基本定时器使能内部时钟，频率为108MHz，经过预分频器后得到10KHz的频率。
-然后就是调用TIM_HAL_TIM_Base_Init函数完成定时器配置。
+接下来设置定时器周期数为4999，即计数5000次生成事件。设置定时器预分频器为(20000-1)，基本定时器使能内部时钟，频率为200MHz，经过预分频器后得到10KHz的频率。然后就是调用TIM_HAL_TIM_Base_Init函数完成定时器配置。
 
 最后使用HAL_TIM_Base_Start_IT函数开启定时器和更新中断。
 
 定时器中断服务函数
 ======================
 
-代码清单 31‑5 定时器中断服务函数
+代码清单 31‑5 定时器中断服务函数（stm32h7xx_it.c文件）
 
 .. code-block:: c
    :name: 代码31_5
 
-    void  BASIC_TIM_IRQHandler (void)
+    void BASIC_TIM_IRQHandler(void)
     {
-        HAL_TIM_IRQHandler(&TIM_TimeBaseStructure);
-    }
-    void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
-    {
-        if (htim==(&TIM_TimeBaseStructure)) {
-            LED1_TOGGLE;  //红灯周期闪烁
-        }
+        HAL_TIM_IRQHandler(&TIM_Base);
     }
 
 我们在TIM_Mode_Config函数启动了定时器更新中断，在发生中断时，中断服务函数就得到运行。在服务函数内直接调用库函数HAL_TIM_IRQHandler函数，它会产生一个中断回调函数HAL_TIM_PeriodElapsedCallback，用来添加用户代码，确定是TIM6产生中断后才运行RGB彩灯翻转动作。
+
+代码清单 31‑5-1 TIM更新中断回调函数（bsp_basic_tim.c文件）
+
+.. code-block:: c
+   :name: 代码31_5_1
+
+    /**
+    * @brief  定时器更新中断回调函数
+    * @param  htim : TIM句柄
+    * @retval 无
+    */
+    void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
+    {
+        if (htim->Instance == TIM6)
+            LED1_TOGGLE;
+    }
 
 主函数
 ===========
@@ -280,12 +310,12 @@ NCIV配置
 
     int main(void)
     {
-        /* 初始化系统时钟为216MHz */
+        /* 系统时钟初始化成400MHz */
         SystemClock_Config();
         /* 初始化LED */
         LED_GPIO_Config();
         /* 初始化基本定时器定时，1s产生一次中断 */
-        TIMx_Configuration();
+        TIM_Basic_Init();
 
         while (1) {
         }
@@ -293,9 +323,9 @@ NCIV配置
 
 实验中先初始化系统时钟，用到RGB彩灯，需要对其初始化配置。LED_GPIO_Config函数是定义在bsp_led.c文件的完成RGB彩灯GPIO初始化配置的程序。
 
-TIMx_Configuration函数是定义在bsp_basic_tim.c文件的一个函数，它只是简单的先后调用TIMx_NVIC_Configuration和TIM_Mode_Config两个函数完成NVIC配置和基本定时器模式配置。
+TIM_Basic_Init函数是定义在bsp_basic_tim.c文件的一个函数，它只是简单的先后调用TIMx_NVIC_Configuration和TIMx_Configuration两个函数完成NVIC配置和基本定时器模式配置。
 
 下载验证
-^^^^^^^^
+''''''''''''''
 
 保证开发板相关硬件连接正确，把编译好的程序下载到开发板。开始RGB彩灯是暗的，等一会RGB彩灯变为红色，再等一会又暗了，如此反复。如果我们使用表钟与RGB彩灯闪烁对比，可以发现它是每0.5s改变一次RGB彩灯状态的。

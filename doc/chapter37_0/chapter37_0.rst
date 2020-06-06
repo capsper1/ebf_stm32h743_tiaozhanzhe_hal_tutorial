@@ -1,7 +1,7 @@
 CAN—通讯实验
 ------------
 
-本章参考资料：《STM32H74xxx参考手册2》、《STM32F7xx规格书》、库帮助文档《STM32F779xx_User_Manual.chm》。
+本章参考资料：《STM32H743用户手册》、《STM32H743xI规格书》、库帮助文档《STM32H753xx_User_Manual.chm》。
 
 若对CAN通讯协议不了解，可先阅读《CAN总线入门》、《CAN-bus规范》文档内容学习。
 
@@ -368,123 +368,102 @@ CAN)，它支持CAN协议2.0A和2.0B标准。
 STM32的CAN架构剖析
 ^^^^^^^^^^^^^^^^^^
 
-.. image:: media/image12.jpeg
+.. image:: media/image12.jpg
    :align: center
    :alt: 图 39‑12 STM32的CAN外设架构图
    :name: 图39_0_12
 
 图 39‑12  STM32的CAN外设架构图
 
-STM32的有两组CAN控制器，其中CAN1是主设备，框图中的“存储访问控制器”是由CAN1控制的，CAN2无法直接访问存储区域，所以使用CAN2的时候必须使能CAN1外设的时钟。框图中主要包含CAN控制内核、发送邮箱、接收FIFO以及验收筛选器，下面对框图中的各个部分进行介绍。
+STM32H7有两组FDCAN控制器，框图中主要包含CAN控制内核、CAN相关的控制寄存器及配置寄存器、发送管理单元以及接收管理单元，验收筛选器被包含在接受管理单元单元中。
+发送过程，程序员将需要需要发送的内容，包括ID，数据长度码，数据等，按照一定的格式写入到消息RAM的地址中，发送管理单元从消息RAM的地址中读取，交给CAN控制内核，由控制内核完成发送过程。
+接受过程，CAN接受到数据时，根据验收筛选器的配置，对消息进行筛选，如果ID匹配的话，则将消息存放到相应的消息RAM中。
+下面对框图中的各个部分进行介绍。
 
 CAN控制内核
 '''''''''''
 
-框图中标号处的CAN控制内核包含了各种控制寄存器及状态寄存器，我们主要讲解其中的主控制寄存器CAN_MCR及位时序寄存器CAN_BTR。
+框图中1标号处的CAN内核包含了协议控制器和接收/发送移位寄存器。 它支持所有ISO 11898-1：2015协议，并支持11位和29位的ID标识。 
 
-主控制寄存器CAN_MCR
-....................
+CAN控制寄存器和配置寄存器
+''''''''''''''''''''''''''''''''''
 
-主控制寄存器CAN_MCR负责管理CAN的工作模式，它使用以下寄存器位实现控制。
+框图中标号2处为CAN的控制寄存器和配置寄存器，包含了各种控制寄存器及状态寄存器，我们主要讲解其中的控制寄存器FDCAN_CCCR及位时序寄存器CAN_BTR。
 
-(1) DBF调试冻结功能
+控制寄存器FDCAN_CCCR
+.....................
 
-..
+控制寄存器FDCAN_CCCR负责管理CAN的工作模式，它通过修改相应的寄存器位实现各种功能控制。
 
-   DBF(Debug
-   freeze)调试冻结，使用它可设置CAN处于工作状态或禁止收发的状态，禁止收发时仍可访问接收FIFO中的数据。这两种状态是当STM32芯片处于程序调试模式时才使用的，平时使用并不影响。
+(1)	初始化模式
 
-(2) *TTCM时间触发模式*
+初始化时，需要将寄存器CCCR的位INIT和位CCE置1，才能够配置寄存器。在该模式，传输停止。只有当位 INIT清零时，才退出初始化模式。之后，BSP通过等待11个连续隐形电平的序列，进行数据同步，才可以开始进行数据传输。
 
-..
+(2)	正常模式
 
-   TTCM(Time triggered communication
-   mode)时间触发模式，它用于配置CAN的时间触发通信模式 ，在此模式下，CAN使用它内部定时器产生时间戳，
-   并把它保存在CAN_RDTxR、CAN_TDTxR寄存器中。内部定时器在每个CAN位时间累加，在接收和发送的帧起始位被采样，
-   并生成时间戳。利用它可以实现ISO 11898-4 CAN标准的分时同步通信功能。
+当初始化FDCAN完成，且寄存器CCCR的位INIT和位CCE也被清零后，数据同步过后，则FDCAN就可以正常通讯了。
+FDCAN接收的数据经过接收筛选器之后，可以选择存放接收缓冲区或者是接收FIFO。发送数据时，可以通过更新发送缓冲区，发送FIFO或者发送队列中的值。
 
-(3) ABOM自动离线管理
+(3)	FDCMD模式
 
-..
+通过配置FDCAN_CCCR的位FDOE来使能该模式，只有当FDCAN_CCCR的位INIT和位CCE均被置位时，可以改变该位的值。FDCAN协议有两种协议，一种是LFM模式，即发送的CAN报文中的数据段超出了8个字节。在该模式下，数据长度码（DLC）与标准的CAN协议有所区别：DLC段表示的数字为0~8时，与标准CAN协议一样，用于表示本报文中的数据段含有多少个字节。DLC的字段为9~15时，传统的CAN协议数据段最大只能是8个字节，而FDCAN模式下的数据段最大支持64个字节。具体见下面表格-FDCAN模式下DLC段的含义（9~15）。
 
-   ABOM (Automatic bus-off management)自动离线管理，它用于设置是否使用自动离线管理功能。
-   当节点检测到它发送错误 或接收错误 超过一定值时，会自动进入离线状态 ，在离线状态中，
-   CAN不能接收或发送报文。处于离线状态的时候，可以软件控制恢复或者直接使用这个自动离线管理功能，它会在适当的时候自动恢复。
++----------------------+----+----+----+----+----+----+----+
+| DLC                  | 9  | 10 | 11 | 12 | 13 | 14 | 15 |
++======================+====+====+====+====+====+====+====+
+| Number of data bytes | 12 | 16 | 20 | 24 | 32 | 48 | 64 |
++----------------------+----+----+----+----+----+----+----+
 
-(4) AWUM自动唤醒
+另一种是FFM模式，采用较高的比特率传输CAN报文中的控制段，数据段以及CRC段，而帧起始和帧结束采用较低的比特率进行传输。数据段的比特率取决于FDCAN的内核时钟。例如，FDCAN的内核时钟为20MHz，而数据段的时间长度最短可以选择4个Tq，则此时的数据传输的比特率最大，为5Mbit/s。
 
-..
+(4)	操作受限模式
 
-   AWUM (Automatic bus-off
-   management)，自动唤醒功能，CAN外设可以使用软件进入低功耗的睡眠模式，如果使能了这个自动唤醒功能，当CAN检测到总线活动的时候，会自动唤醒。
+操作受限模式（Restricted Operation Mode），通过软件将FDCAN_CCCR的位ASM置一，则进入该模式。在此模式下，通讯节点只能接受数据帧和遥控帧 ，不能发送数据帧，遥控帧，错误帧和过载帧。此外，当发送单元没有及时从Message RAM中读取数据时，也会自动自动进入该模式。此时需要手动将FDCAN_CCCR的位ASM位清零，才可以退出该模式。
 
-(5) NART自动重传
+(5)	总线监控模式
 
-..
+当FDCAN_CCCR的位MON或者是发送重大的错误时，会进入该模式。在这个模式下，FDCAN能接受到有效的数据帧和遥控帧，但是不能使用传输功能。这种模式可以用来分析 CAN总线的数据流量。
 
-   NART(No automatic retransmission)报文自动重传功能，设置这个功能后，
-   当报文发送失败时会自动重传至成功为止。若不使用这个功能，无论发送结果如何，消息只发送一次。
+(6)	低功耗模式
 
-(6) RFLM 锁定模式
+Power Down(Sleep mode)，低功耗模式，CAN外设可以使用软件进入低功耗的睡眠模式，如果使能了这个自动唤醒功能，当CAN检测到总线活动的时候，会自动唤醒。
 
-..
+(7)	DAR自动重传
 
-   RFLM(Receive FIFO locked mode)FIFO锁定模式，该功能用于锁定接收FIFO 。
-   锁定后，当接收FIFO溢出时，会丢弃下一个接收的报文。若不锁定，则下一个接收到的报文会覆盖原报文。
-
-(7) TXFP报文发送优先级的判定方法
-
-..
-
-   TXFP(Transmit FIFO priority)报文发送优先级的判定方法，当CAN外设的发送邮箱中有多个待发送报文时，
-   本功能可以控制它是根据报文的ID优先级还是报文存进邮箱的顺序来发送。
+DAR(Disabled automatic retransmission)，报文自动重传功能，设置这个功能后，当报文发送失败时会自动重传至成功为止。STM32H7的FDCAN默认是使能自动重传的。可以通过修改FACAN_CCCR寄存在的位DAR，来关闭该功能。
 
 位时序寄存器(CAN_BTR)及波特率
-.................................
+..............................
 
 CAN外设中的位时序寄存器CAN_BTR用于配置测试模式、波特率以及各种位内的段参数。
 
-(1) 测试模式
+(1)	测试模式
 
-为方便调试，STM32的CAN提供了测试模式，配置位时序寄存器CAN_BTR的SILM及LBKM寄存器位可以控制使用正常模式、静默模式、回环模式及静默回环模式，见
-图39_0_13_。
+为方便调试，STM32的CAN提供了测试模式，配置位时序寄存器CAN_BTR的SILM及LBKM寄存器位可以控制使用正常模式、静默模式、回环模式及静默回环模式，见下图
 
-.. image:: media/image13.jpeg
+.. image:: media/image1.jpg
    :align: center
-   :alt: 图 39‑13 四种工作模式
-   :name: 图39_0_13
-
-图 39‑13 四种工作模式
+   :alt: 图 39‑13 工作模式
+   :name: 工作模式
 
 各个工作模式介绍如下：
 
--  正常模式
+1、	正常模式
 
-..
+正常模式下就是一个正常的CAN节点，可以向总线发送数据和接收数据。
 
-   正常模式下就是一个正常的CAN节点，可以向总线发送数据和接收数据。
+2、	外部回环模式
 
--  静默模式
+回环模式下，它自己的输出端的所有内容都直接传输到自己的输入端，输出端的内容同时也会被传输到总线上，即也可使用总线监测它的发送内容。输入端只接收自己发送端的内容，不接收来自总线上的内容。使用回环模式可以进行自检。
 
-..
+3、	内部回环模式
 
-   静默模式下，它自己的输出端的逻辑0数据会直接传输到它自己的输入端，逻辑1可以被发送到总线，所以它不能向总线发送显性位(逻辑0)，只能发送隐性位(逻辑1)。输入端可以从总线接收内容。由于它只可发送的隐性位不会强制影响总线的状态，所以把它称为静默模式。这种模式一般用于监测，它可以用于分析总线上的流量，但又不会因为发送显性位而影响总线。
+回环静默模式是以上两种模式的结合，自己的输出端的所有内容都直接传输到自己的输入端，并且不会向总线发送显性位影响总线，不能通过总线监测它的发送内容。输入端只接收自己发送端的内容，不接收来自总线上的内容。这种方式可以在“热自检”时使用，即自我检查的时候，不会干扰总线。
 
--  回环模式
+以上说的各个模式，是不需要修改硬件接线的，如当输出直连输入时，它是在STM32芯片内部连接的，传输路径不经过STM32的CAN_Tx/Rx引脚，更不经过外部连接的CAN收发器，只有输出数据到总线或从总线接收的情况下才会经过CAN_Tx/Rx引脚和收发器。
 
-..
-
-   回环模式下，它自己的输出端的所有内容都直接传输到自己的输入端，输出端的内容同时也会被传输到总线上，即也可使用总线监测它的发送内容。输入端只接收自己发送端的内容，不接收来自总线上的内容。使用回环模式可以进行自检。
-
--  回环静默模式
-
-..
-
-   回环静默模式是以上两种模式的结合，自己的输出端的所有内容都直接传输到自己的输入端，并且不会向总线发送显性位影响总线，不能通过总线监测它的发送内容。输入端只接收自己发送端的内容，不接收来自总线上的内容。这种方式可以在“热自检”时使用，即自我检查的时候，不会干扰总线。
-
-以上说的各个模式，是不需要修改硬件接线的，例如，当输出直接连输入时，它是在STM32芯片内部连接的，传输路径不经过STM32的CAN_Tx/Rx引脚，更不经过外部连接的CAN收发器，只有输出数据到总线或从总线接收的情况下才会经过CAN_Tx/Rx引脚和收发器。
-
-(2) 位时序及波特率
+位时序及波特率
+......................
 
 STM32外设定义的位时序与我们前面解释的CAN标准时序有一点区别，见 图39_0_14_。
 
@@ -503,23 +482,23 @@ STM32的CAN外设位时序中只包含3段，分别是同步段SYNC_SEG、位段
 
 BS1段时间：
 
-T\ :sub:`S1`\ =Tq x (TS1[3:0] + 1)，
+T\ :sub:`S1`\ =Tq x (TS1[7:0] + 1)，
 
 BS2段时间：
 
-T\ :sub:`S2`\ = Tq x (TS2[2:0] + 1)，
+T\ :sub:`S2`\ = Tq x (TS2[6:0] + 1)，
 
 一个数据位的时间：
 
-T\ :sub:`1bit` =1Tq+T\ :sub:`S1`\ +T\ :sub:`S2` =1+ (TS1[3:0] + 1)+
-(TS2[2:0] + 1)= N Tq
+T\ :sub:`1bit` =1Tq+T\ :sub:`S1`\ +T\ :sub:`S2` =1+ (TS1[7:0] + 1)+
+(TS2[6:0] + 1)= N Tq
 
 其中单个时间片的长度Tq与CAN外设的所挂载的时钟总线及分频器配置有关，CAN1和CAN2外设都是挂载在APB1总线上的，而位时序寄存器CAN_BTR中的BRP[9:0]寄存器位可以设置CAN外设时钟的分频值
 ，所以：
 
-Tq = (BRP[9:0]+1) x T\ :sub:`PCLK`
+Tq = (BRP+1) x T\ :sub:`PCLK`
 
-其中的PCLK指APB1时钟，默认值为54MHz。
+其中的CLK指FDCAN的时钟，可以来源于HSE，PLL1Q，PLL2Q。
 
 最终可以计算出CAN通讯的波特率：
 
@@ -532,256 +511,359 @@ BaudRate = 1/N Tq
 =============== =============================================================
 参数            说明
 SYNC_SE段       固定为1Tq
-BS1段           设置为5Tq (实际写入TS1[3:0]的值为4)
-BS2段           设置为3Tq (实际写入TS2[2:0]的值为2)
-T\ :sub:`PCLK`  APB1按默认配置为F=45MHz，T\ :sub:`PCLK`\ =1/54M
+BS1段           设置为31Tq (实际写入TS1[7:0]的值为0x1F)
+BS2段           设置为8Tq (实际写入TS2[6:0]的值为8)
+T\ :sub:`PCLK`  APB1按默认配置为F=40MHz，T\ :sub:`PCLK`\ =1/40M
 CAN外设时钟分频 设置为5分频(实际写入BRP[9:0]的值为4)
-1Tq时间长度     Tq = (BRP[9:0]+1) x T\ :sub:`PCLK` = 6 x 1/54M=1/9M
-1位的时间长度   T\ :sub:`1bit` =1Tq+T\ :sub:`S1`\ +T\ :sub:`S2` = 1+5+3 = 9Tq
-波特率          BaudRate = 1/N Tq = 1/(1/9M x 9)=1Mbps
+1Tq时间长度     Tq = (BRP[8:0]+1) x T\ :sub:`PCLK` = 1 x 1/40M=1/40M
+1位的时间长度   T\ :sub:`1bit` =1Tq+T\ :sub:`S1`\ +T\ :sub:`S2` = 1+31+8 = 40Tq
+波特率          BaudRate = 1/N Tq = 1/(1/40M x 40)=1Mbps
 =============== =============================================================
 
-CAN发送邮箱
-'''''''''''
+消息RAM
+''''''''''''
+回到图 图39_0_12_
+STM32的CAN外设架构图中的CAN外设框图，在标号处的是FDCAN外设的消息RAM，它的位宽度为32bit。见图 消息RAM_。每一个区域的起始地址可以通过配置相关的寄存器位，见表格消息RAM的配置。
 
-回到 图39_0_12_ 中的CAN外设框图，在标号2处的是CAN外设的发送邮箱，它一共有3个发送邮箱，即最多可以缓存3个待发送的报文。
+.. image:: media/image2.jpg
+   :align: center
+   :alt: 图 39‑14 消息RAM
+   :name: 消息RAM
 
-每个发送邮箱中包含有标识符寄存器CAN_TIxR、数据长度控制寄存器CAN_TDTxR及2个数据寄存器CAN_TDLxR、CAN_TDHxR，它们的功能见表
-39‑5。
+表格 消息RAM的配置
 
-   表 39‑4 发送邮箱的寄存器
++----------------+----------------+--------------------------------+
+| Message RAM    | 对应的寄存器位 | 相关配置说明                   |
++================+================+================================+
+| 11-bit filter  | SIDFC.FLSSA    | 最大为128个字，可以使用128个字 |
++----------------+----------------+--------------------------------+
+| 29-bit filter  | XIDFC.FLESA    | 最大为128个字，可以使用64个字  |
++----------------+----------------+--------------------------------+
+| Rx FIFO 0      | RXF0C.F0SA     | 最大为256个字，可以使用64个字  |
++----------------+----------------+--------------------------------+
+| Rx FIFO 1      | RXF1C.F1SA     | 最大为256个字，可以使用64个字  |
++----------------+----------------+--------------------------------+
+| Rx buffer      | RXBC.RBSA      | 最大为256个字，可以使用64个字  |
++----------------+----------------+--------------------------------+
+| Tx event FIFO  | TXEFC.EFSA     | 最大为64个字，可以使用32个字   |
++----------------+----------------+--------------------------------+
+| Tx buffers     | TXBC.TBSA      | 最大为128个字，可以使用32个字  |
++----------------+----------------+--------------------------------+
+| Trigger memory | TMC.TMSA       | 最大为128个字，可以使用64个字  |
++----------------+----------------+--------------------------------+
 
-=========================== =================================================
-寄存器名                    功能
-标识符寄存器CAN_TIxR        存储待发送报文的ID、扩展ID、IDE位及RTR位
-数据长度控制寄存器CAN_TDTxR 存储待发送报文的DLC段
-低位数据寄存器CAN_TDLxR     存储待发送报文数据段的Data0-Data3这四个字节的内容
-高位数据寄存器CAN_TDHxR     存储待发送报文数据段的Data4-Data7这四个字节的内容
-=========================== =================================================
+CAN接收FIFO 
+..............
 
-当我们要使用CAN外设发送报文时，把报文的各个段分解，按位置写入到这些寄存器中，并对标识符寄存器CAN_TIxR中的发送请求寄存器位TMIDxR_TXRQ置1，即可把数据发送出去。
+消息RAM
+中有两个接收FIFO。STM32内部读取FIFO数据之后，报文计数器会自加。每个FIFO中最多可以缓存64个字大小的数据，通过相应的寄存器RXFnC(n=0,1)进行配置。接受FIFO有两种工作模式，一种是阻塞模式（RXFxC.FnOM=’0’时）(n=0,1)，当接受FIFO已经溢出的时候，寄存器RXFnS（n=0,1）的位FnF会被置1，同时相应的中断标志位IR.RFnF也会被置1。如果此时又接收到数据时，则这帧数据会被丢弃，不进行接受，同时寄存器RXFnS(n=0,1)的位RFnL和中断标志位IR.RFnL会被置1；另一种是覆盖模式（当RXFnC.FnOM被置1时）(n=0,1)，当接受FIFO溢出时，新的数据会将旧的数据进行覆盖。接收FIFO的数据格式，见图 接受FIFO的数据格式_，数据段支持的最大字节数是64字节，可以通过寄存器RXESC进行配置。对于接受缓冲区（Rx
+Buffer）也是一样的。
 
-其中标识符寄存器CAN_TIxR中的STDID寄存器位比较特别。我们知道CAN的标准标识符的总位数为11位，而扩展标识符的总位数为29位的。当报文使用扩展标识符的时候，标识符寄存器CAN_TIxR中的STDID[10:0]等效于EXTID[18:28]位，它与EXTID[17:0]共同组成完整的29位扩展标识符。
+.. image:: media/image3.jpg
+   :align: center
+   :alt: 接受FIFO的数据格式
+   :name: 接受FIFO的数据格式
 
-CAN接收FIFO
+图 接受FIFO的数据格式
+
+表格 接受FIFO数据格式的具体描述
+
++--------------------+----------------------+
+| 位                 | 具体描述             |
++====================+======================+
+| ESI                | 错误状态标志         |
++--------------------+----------------------+
+| XTD                | 扩展格式ID标志       |
++--------------------+----------------------+
+| RTR                | 遥控帧标识符         |
++--------------------+----------------------+
+| ID[28:0]           | ID号                 |
++--------------------+----------------------+
+| ANMF               | 接受ID不匹配的数据帧 |
++--------------------+----------------------+
+| FIDX[6:0]          | 筛选器编号           |
++--------------------+----------------------+
+| Res                | 保留                 |
++--------------------+----------------------+
+| FDF                | FDCAN的数据格式      |
++--------------------+----------------------+
+| BRS                | 位时序切换           |
++--------------------+----------------------+
+| DLC[3:0]           | 数据长度             |
++--------------------+----------------------+
+| RXTS[15:0]         | 时间戳               |
++--------------------+----------------------+
+| DBn（n=0,1,2,...） | 数据段               |
++--------------------+----------------------+
+
+下面对其中一些重要的数据位，进行说明：
+
+(1)  位ESI：当检测到错误时是否将发送错误标志
+
+(2)  位XTD：决定接受ID的位数是11位还是29位。1表示29位扩展格式的ID，0表示11位标准格式的ID。
+
+(3)  位RTR：遥控帧标识符。用于向远端节点请求数据。
+
+(4)  ID[28:0]：用来存放ID。ID的位数由XTD位决定。若ID是11位的，则存放在ID[28:18]为中。
+
+(5)  位ANMF：决定FDCAN是否接收不匹配的数据帧。
+
+(6)  FIDX[6:0]：验收筛选器的编号；
+
+(7)  FDF：决定数据帧的格式。可选择标准帧格式（该位为0）和FDCAN帧格式（该位为1）。
+
+(8)  BRS：主要用FDCAN的FFM模式。传输数据阶段是否进行位时序切换。
+
+(9)  DLC：数据长度码，CAN一般可接受8个字节，而FDCAN能够接受12/16/20/24/32/48/64个字节。
+
+(10) DBn：数据段，FDCAN最大支持64个字节数据，可通过配置寄存器RXESC进行修改。
+
+CAN发送缓冲区
+.................
+
+消息RAM中由一个发送缓冲区，最多可以使用32个缓冲区。每一个发送缓冲区可以配置一个ID，如果多个缓冲区配置成同一个ID的话，则优先传输缓冲区序号最低的那个。可以通过寄存器TXBAR[ARn]来修改发送的内容，数据的格式如图 发送的数据格式_。
+
+.. image:: media/image4.jpg
+   :align: center
+   :alt: 图发送的数据格式
+   :name: 发送的数据格式
+
+图 发送的数据格式
+
+表格 发送数据的格式具体描述
+
++--------------------+-----------------+
+| 位                 | 具体描述        |
++====================+=================+
+| ESI                | 错误状态标志    |
++--------------------+-----------------+
+| XTD                | 扩展格式ID标志  |
++--------------------+-----------------+
+| RTR                | 遥控帧表示      |
++--------------------+-----------------+
+| ID[28:0]           | ID号            |
++--------------------+-----------------+
+| MM                 | 信息识别标志    |
++--------------------+-----------------+
+| EFC                | 事件FIFO使能    |
++--------------------+-----------------+
+| FDF                | FDCAN的数据格式 |
++--------------------+-----------------+
+| BRS                | 位时序切换      |
++--------------------+-----------------+
+| DLC[3:0]           | 数据长度        |
++--------------------+-----------------+
+| DBn（n=0,1,2,...） | 数据段          |
++--------------------+-----------------+
+
+大部分的数据位与接受FIFO相同，不过，多了以下这些参数：
+
+(1) MM：信息识别标志，发送数据时，会被拷贝到发送事件FIFO中。
+
+(2) EFC：是否使用事件FIFO的功能。
+
+其余的数据格式可以参考上面表格 接受FIFO数据格式的具体描述。
+
+发送管理单元
+''''''''''''''
+
+回到 图39_0_12_ 中的CAN外设框图，在标号4发送管理单元用于将消息RAM中的信息发送给CAN控制内核。发送缓冲区最大可以配置为32个，也可以作为发送队列使用。详细说明参考第三点消息RAM的内容。CAN发送的数据段大小为2~16个字。一些相关的配置参数，见
+CAN发送配置_，FDCAN主要有三种模式可以选择，分别是标准的CAN协议，即Classic CAN，要求数据段长度小于8；还有FDCAN模式，又可以分为FFM和 LFM。第一种要求用较高的比特率传输数据段的内容，对应图 CAN发送配置_ 的最后一种配置；第二种是传输的数据段长度超过了8个字节，对应了第三、第五的配置。
+
+.. image:: media/image5.jpg
+   :align: center
+   :alt: 图CAN发送配置
+   :name: CAN发送配置
+
+接受管理单元
 ''''''''''''
 
-图39_0_12_ 中的CAN外设框图，在标号3处的是CAN外设的接收FIFO，它一共有2个接收FIFO，每个FIFO中有3个邮箱，
-即最多可以缓存6个接收到的报文。当接收到报文时，FIFO的报文计数器会自增，而STM32内部读取FIFO数据之后，报文计数器会自减，
-我们通过状态寄存器可获知报文计数器的值，而通过前面主控制寄存器的RFLM位，可设置锁定模式，锁定模式下FIFO溢出时会丢弃新报文，
-非锁定模式下FIFO溢出时新报文会覆盖旧报文。
-
-跟发送邮箱类似，每个接收FIFO中包含有标识符寄存器CAN_RIxR、数据长度控制寄存器CAN_RDTxR及2个数据寄存器CAN_RDLxR、CAN_RDHxR，它们的功能见表
-39‑5。
-
-   表 39‑5 发送邮箱的寄存器
-
-=========================== ===============================================
-寄存器名                    功能
-标识符寄存器CAN_RIxR        存储收到报文的ID、扩展ID、IDE位及RTR位
-数据长度控制寄存器CAN_RDTxR 存储收到报文的DLC段
-低位数据寄存器CAN_RDLxR     存储收到报文数据段的Data0-Data3这四个字节的内容
-高位数据寄存器CAN_RDHxR     存储收到报文数据段的Data4-Data7这四个字节的内容
-=========================== ===============================================
-
-通过中断或状态寄存器知道接收FIFO有数据后，我们再读取这些寄存器的值即可把接收到的报文加载到STM32的内存中。
+回到 图39_0_12_ 中的CAN外设框图中的CAN外设框图，在标号5处的是CAN外设的接受管理单元，他包含了筛选器组，两个接受FIFO和接受缓冲区。关于接受 FIFO和接受缓冲区，可以翻看前面消息RAM小节，下面看一下验收筛选器：
 
 验收筛选器
-''''''''''
+................
 
-图39_0_12_ 中的CAN外设框图，在标号4处的是CAN外设的验收筛选器，一共有28个筛选器组，每个筛选器组有2个寄存器，CAN1和CAN2共用的筛选器的。
+在 CAN 协议中，消息的标识符与节点地址无关，但与消息内容有关。因此，发送节点将报文广播给所有接收器时，接收节点会根据报文标识符的值来确定软件是否需要该消息，为了简化软件的工作，STM32的CAN外设接收报文前会先使用验收筛选器检查，只接收需要的报文到FIFO中。
 
-在 CAN
-协议中，消息的标识符与节点地址无关，但与消息内容有关。因此，发送节点将报文广播给所有接收器时，接收节点会根据报文标识符的值来确定软件是否需要该消息，为了简化软件的工作，STM32的CAN外设接收报文前会先使用验收筛选器检查，只接收需要的报文到FIFO中。
+筛选器工作的时候，根据过滤的方法分为以下三种模式：
 
-筛选器工作的时候，可以调整筛选ID的长度及过滤模式。根据筛选ID长度来分类有有以下两种：
+(1)	标识符列表模式（range filter），要求报文ID与列表中的某一个标识符完全相同才可以接收，可以理解为白名单管理。
 
-(1) 检查 STDID[10:0]、 EXTID[17:0]、 IDE 和 RTR 位，一共31位。
+(2)	特定的ID号（dual  ID filter），验收筛选器只能接受符合特定ID号的信息，最多支持两个ID。
 
-(2) 检查STDID[10:0]、 RTR、 IDE 和 EXTID[17:15]，一共16位。
+(3)	掩码模式（classic filter），它把可接收报文ID的某几位作为列表，这几位被称为掩码，可以把它理解成关键字搜索，只要掩码(关键字)相同，就符合要求，报文就会被保存到接收FIFO。若掩码的各个位均为1，则只有筛选出的ID与接受的ID段一致，该数据才会被接受到FIFO中，否则则会被舍弃。见图 掩码全为1的情况_。图 掩码不全为0的情况_ 展示了掩码不全为0的情况，他是一组包含了多个的ID值，其中x表示该位可以为1也可以为0。
 
-通过配置筛选尺度寄存器CAN_FS1R的FSCx位可以设置筛选器工作在哪个尺度。
-
-而根据过滤的方法分为以下两种模式：
-
-(1) 标识符列表模式，它把要接收报文的ID列成一个表，要求报文ID与列表中的某一个标识符完全相同 才可以接收，可以理解为白名单管理。
-
-(2) 掩码模式，它把可接收报文ID的某几位作为列表，这几位被称为掩码，可以把它理解成关键字搜索，
-    只要掩码(关键字)相同，就符合要求，报文就会被保存到接收FIFO。
-
-通过配置筛选模式寄存器CAN_FM1R的FBMx位可以设置筛选器工作在哪个模式。
-
-不同的尺度和不同的过滤方法可使筛选器工作在图 39‑15的4种状态。
-
-.. image:: media/image15.jpeg
+.. image:: media/image6.jpg
    :align: center
-   :alt: 图 39‑15 筛选器的4种工作状态
-   :name: 图39_0_15
+   :alt: 图掩码全为1的情况
+   :name: 掩码全为1的情况
 
-图 39‑15 筛选器的4种工作状态
+图 掩码全为1的情况
 
-每组筛选器包含2个32位的寄存器，分别为CAN_FxR1和CAN_FxR2，它们用来存储要筛选的ID或掩码，各个寄存器位代表的意义与图中两个寄存器下面“映射”的一栏一致，各个模式的说明见表39‑6。
+.. image:: media/image7.jpg
+   :align: center
+   :alt: 图掩码不全为0的情况
+   :name: 掩码不全为0的情况
 
-   表 39‑6 筛选器的工作状态说明
-
-+----------------+----------------------------------------------------+
-|      模式      |                        说明                        |
-+================+====================================================+
-| 32位掩码模式   | CAN_FxR1存储ID，CAN_FxR2存储哪个位必须要与CAN      |
-|                | _FxR1中的ID一致，2个寄存器表示1组掩码。            |
-+----------------+----------------------------------------------------+
-| 32位标识符模式 | CAN_FxR1和CAN_FxR2各存储1个ID，2个寄存器表示2      |
-|                | 个筛选的ID                                         |
-+----------------+----------------------------------------------------+
-| 16位掩码模式   | CAN_FxR1高16位存储ID，低16位存储哪个位必须要与高16 |
-|                | 位的ID一致；                                       |
-|                |                                                    |
-|                | CAN_FxR2高16位存储ID，低16位存储哪个位必须要与高16 |
-|                | 位的ID一致                                         |
-|                |                                                    |
-|                | 2个寄存器表示2组掩码。                             |
-+----------------+----------------------------------------------------+
-| 16位标识符模式 | CAN_FxR1和CAN_FxR2各存储2个ID，2个寄存器表示4      |
-|                | 个筛选的ID                                         |
-+----------------+----------------------------------------------------+
-
-例如下面的表格所示，在掩码模式时，第一个寄存器存储要筛选的ID，第二个寄存器存储掩码，掩码为1的部分表示该位必须与ID中的内容一致，筛选的结果为表中第三行的ID值，它是一组包含多个的ID值，其中x表示该位可以为1可以为0。
-
-======== = = = = = = = =
-ID       1 0 1 1 1 0 1 …
-掩码     1 1 1 0 0 1 0 …
-筛选的ID 1 0 1 x x 0 x …
-======== = = = = = = = =
-
-而工作在标识符模式时，2个寄存器存储的都是要筛选的ID，它只包含2个要筛选的ID值(32位模式时)。
-
-如果使能了筛选器，且报文的ID与所有筛选器的配置都不匹配，CAN外设会丢弃该报文，不存入接收FIFO。
-
-整体控制逻辑
-''''''''''''
-
-回到 图39_0_12_ 结构框图，图中的标号5处表示的是CAN2外设的结构，它与CAN1外设是一样的，
-他们共用筛选器且由于存储访问控制器由CAN1控制，所以要使用CAN2的时候必须要使能CAN1的时钟。
+图 掩码不全为0的情况
 
 CAN初始化结构体
 ~~~~~~~~~~~~~~~
 
-从STM32的CAN外设我们了解到它的功能非常多，控制涉及的寄存器也非常丰富，而使用STM32 HAL库提供的各种结构体及库函数可以简化这些控制过程。
-跟其它外设一样，STM32 HAL库提供了CAN初始化结构体及初始化函数来控制CAN的工作方式，提供了收发报文使用的结构体及收发函数，还有配置控制筛选器模式及ID的结构体。
-这些内容都定义在库文件“STM32F7xx_hal_can.h”及“STM32F7xx_hal_can.c”中，
-编程时我们可以结合这两个文件内的注释使用或参考库帮助文档。
+从STM32的CAN外设我们了解到它的功能非常多，控制涉及的寄存器也非常丰富，而使用STM32 HAL库提供的各种结构体及库函数可以简化这些控制过程。跟其它外设一样，STM32 HAL库提供了CAN初始化结构体及初始化函数来控制CAN的工作方式，提供了收发报文使用的结构体及收发函数，还有配置控制筛选器模式及ID的结构体。这些内容都定义在库文件“stm32h7xx_hal_fdcan.h”及“stm32h7xx_hal_fdcan.c”中，编程时我们可以结合这两个文件内的注释使用或参考库帮助文档。
 
-首先我们来学习初始化结构体的内容，见 代码清单39_0_1_。
+首先我们来学习初始化结构体的内容，见  代码清单 CAN初始化结构体_ 和 代码清单39_0_1_ FDCAN外设管理结构体。
 
-代码清单 39‑1 CAN初始化结构体
+代码清单 CAN初始化结构体
+
+.. code-block:: c
+   :name: CAN初始化结构体
+
+   /**
+      * @brief  FDCAN外设管理结构体
+      */
+   typedef struct {
+      FDCAN_GlobalTypeDef         *Instance;  /*!< FDCAN外设寄存器基地址*/
+   
+      TTCAN_TypeDef               *ttcan;     /*!< TTCAN外设寄存器基地址*/
+   
+      FDCAN_InitTypeDef           Init;       /*!< FDCAN参数配置结构体*/
+   
+      FDCAN_MsgRamAddressTypeDef  msgRam;     /*!< FDCAN消息RAM结构体*/
+   
+      __IO HAL_FDCAN_StateTypeDef State;      /*!< FDCAN工作状态*/
+   
+      HAL_LockTypeDef             Lock;       /*!< 锁资源*/
+   
+      __IO uint32_t               ErrorCode;  /*!< 操作错误参数*/
+   
+   } FDCAN_HandleTypeDef;
+
+(1)	Instance：结构体指针，本成员用于指向用户使用的FDCAN寄存器基地址，方便对I2C寄存器进行配置。
+
+(2)	Ttcan：结构体指针，本成员用于用于指向用户所使用使用的TTCAN寄存器的基地址，本章节没有使用TTCAN的功能，不做详细解释。
+
+(3)	Init：初始化结构体，主要用来配置FDCAN的时钟分频和FDCAN的工作模式，具体见下面分析。
+
+(4)	msgRam：是一个信息RAM的结构体，主要用缓存信息。我们要发送的数据，通过写入到该结构体成员TxBufferSA中，调用HAL_FDCAN_EnableTxBufferRequest函数，将缓冲区的内容发送出去。
+
+(5)	Lock：主要负责分配锁资源，可选择HAL_UNLOCKED或者是HAL_LOCKED两个参数。
+
+(6)	State：主要用来记录FDCAN的工作状态。
+
+(7)	ErrorCode：主要保存了FDCAN通讯时发生的错误类型，提供给用户进行排查错误。
+
+代码清单 39‑1 CAN初始化结构体（stm32h7xx_hal_fdcan.h文件）
 
 .. code-block:: c
    :name: 代码清单39_0_1
 
    /**
-      * @brief  CAN 初始化结构体
+      * @brief FDCAN初始化结构体
       */
    typedef struct {
-      uint32_t Prescaler;        /*配置CAN外设的时钟分频，可设置为1-1024*/
-      uint32_t  Mode;            /*配置CAN的工作模式，回环或正常模式*/
-      uint32_t  SJW;             /*配置SJW极限值 */
-      uint32_t  BS1;             /*配置BS1段长度*/
-      uint32_t  BS2;             /*配置BS2段长度 */
-      uint32_t  TTCM; 		/*是否使能TTCM时间触发功能*/
-      uint32_t  ABOM;		/*是否使能ABOM自动离线管理功能*/
-      uint32_t  AWUM;  		/*是否使能AWUM自动唤醒功能 */
-      uint32_t  NART; 		/*是否使能NART自动重传功能*/
-      uint32_t  RFLM;  		/*是否使能RFLM锁定FIFO功能*/
-      uint32_t  TXFP;  		/*配置TXFP报文优先级的判定方法*/
-   } CAN_InitTypeDef;
+      uint32_t FrameFormat;               /*!< FDCAN帧的格式*/
+   
+      uint32_t Mode;                       /*!< FDCAN的工作模式*/
+   
+      FunctionalState AutoRetransmission;  /*!< 是否使能自动重传功能*/
+   
+      FunctionalState TransmitPause;    /*!< 是否使能传输暂停*/
+   
+      FunctionalState ProtocolException; /*!<异常处理功能*/
+   
+      uint32_t NominalPrescaler;  /*!< 时钟的分频因子，可设置为1~512*/
+   
+      uint32_t NominalSyncJumpWidth;         /*!< 配置SJW极限值*/
+   
+      uint32_t NominalTimeSeg1;      /*!< 配置Seg1段的长度*/
+   
+      uint32_t NominalTimeSeg2;      /*!< 配置Seg2段的长度 */
+   
+      uint32_t DataPrescaler;       /*!< 数据段的时钟分频因子，可配置为1~32*/
+   
+      uint32_t DataSyncJumpWidth;    /*!< 配置数据段的SJW极限值，可配置为1~16*/
+   
+      uint32_t DataTimeSeg1; /*!<配置数据段的Seg1段的长度，可配置为1~32*/
+      uint32_t DataTimeSeg2;    /*!<配置数据段的Seg2段的长度，可配置为1~16*/
+      
 
-这些结构体成员说明如下，其中括号内的文字是对应参数在STM32
-HAL库中定义的宏，这些结构体成员都是“39.2.11CAN控制内核”小节介绍的内容，可对比阅读：
+      uint32_t MessageRAMOffset;             /*!< 消息RAM的地址偏移量*/
 
-(1) Prescaler
+      uint32_t StdFiltersNbr;  /*!< 标准ID的个数，可配置为0~128*/
 
-..
+      uint32_t ExtFiltersNbr;  /*!< 扩展ID的个数，可配置为0~128*/
 
-   本成员设置CAN外设的时钟分频，它可控制时间片Tq的时间长度，这里设置的值最终会减1后再写入BRP寄存器位，即前面介绍的Tq计算公式：
+      uint32_t RxFifo0ElmtsNbr; /*!< 使用RXFIFO0的个数，可配置为0~64*/
 
-   Tq = (BRP[9:0]+1) x T\ :sub:`PCLK`
+      uint32_t RxFifo0ElmtSize; /*!< RXFIFO0中数据的字节数，最大支持64字节*/
 
-   等效于：Tq = CAN_Prescaler x T\ :sub:`PCLK`
+      uint32_t RxFifo1ElmtsNbr; /*!< 使用RXFIFO1的个数，可配置为0~64*/
 
-(2) Mode
+      uint32_t RxFifo1ElmtSize; /*!< RXFIF1中数据的字节数，最大支持64字节*/
 
-..
+      uint32_t RxBuffersNbr; /*!< 使用RX缓冲区的个数，可配置为0~64*/
 
-   本成员设置CAN的工作模式，可设置为正常模式(CAN_MODE_NORMAL)、回环模式(CAN_MODE_LOOPBACK)、静默模式(CAN_MODE_SILENT)以及回环静默模式(CAN_MODE_SILENT_LOOPBACK)。
+      uint32_t RxBufferSize; /*!< RX缓冲中数据的字节数，最大支持64字节*/
+      
 
-(3) SJW
+      uint32_t TxEventsNbr; /*!<使用Tx事件缓冲区的个数，可配置为0~32*/
+      
 
-..
+      uint32_t TxBuffersNbr; /*!< 使用TX缓冲区的个数，可配置为0~32*/
 
-   本成员可以配置SJW的极限长度，即CAN重新同步时单次可增加或缩短的最大长度，它可以被配置为1-4Tq(CAN_SJW_1/2/3/4tq)。
+      uint32_t TxFifoQueueElmtsNbr; /*!<使用TXFIFO或者是队列的个数，可配置为0~32*/
+      
 
-(4) BS1
+      uint32_t TxFifoQueueMode; /*!< 选择TXFIFO模式或者是Tx队列模式*/
 
-..
+      uint32_t TxElmtSize; /*!< 发送数据的字节数，最大支持64字节*/
 
-   本成员用于设置CAN位时序中的BS1段的长度，它可以被配置为1-16个Tq长度(CAN_BS1_1/2/3…16tq)。
+   } FDCAN_InitTypeDef;
 
-(5) BS2
+(1)	FrameFormat：选择FDCAN帧格式。可选择标准的帧格式，或者变位时序的帧格式。
 
-..
+(2)	Mode：选择FDCAN的工作模式，可配置为正常模式，内部回环测试模式，外部回环测试模式等。
 
-   本成员用于设置CAN位时序中的BS2段的长度，它可以被配置为1-8个Tq长度(CAN_BS2_1/2/3…8tq)。
+(3)	AutoRetransmission：是否使用自动重传功能，使用自动重传功能时，会一直发送报文直到成功为止。
 
-   SYNC_SEG、BS1段及BS2段的长度加起来即一个数据位的长度，即前面介绍的原来计算公式：
+(4)	TransmitPause：传输暂停模式。如果该位置1，则FDCAN在下一次开始之前和成功发送帧之间，暂停两个Tq。
 
-   T\ :sub:`1bit` =1Tq+T\ :sub:`S1`\ +T\ :sub:`S2` =1+ (TS1[3:0] + 1)+
-   (TS2[2:0] + 1)
+(5)	ProtocolException：异常处理功能。
 
-   等效于：T\ :sub:`1bit` = 1Tq+CAN_BS1+CAN_BS2
+(6)	NominalPrescaler：时钟分频因子，控制时间片Tq的时间长度。
 
-(6) TTCM
+(7)	NominalSyncJumpWidth：配置SJW的极限长度，即CAN重新同步是单次可增加或缩短的最大长度。
 
-..
+(8)	NominalTimeSeg1：配置CAN时序中的BS1段的长度，是PTS段和PBS1段的时间长度时间长度之和。
 
-   本成员用于设置是否使用时间触发功能(ENABLE/DISABLE)，时间触发功能在某些CAN标准中会使用到。
+(9)	NominalTimeSeg2：配置CAN位时序中的BS2段的长度。
 
-(7) ABOM
+(10)	DataPrescaler、DataSyncJumpWidth、DataTimeSeg1、DataTimeSeg2：这四个参数主要是用来配置FDCAN的FFM模式。FFM模式要求数据段的传输速度要高于起始帧和结束帧。这四个参数分别是数据段时钟分频因子，数据段SJW的极限长度，数据段的BS1的长度，BS2段的长度。具体作用于（6）~（9）相同。
 
-..
+(11)	MessageRAMOffset：消息RAM的偏移地址。
 
-   本成员用于设置是否使用自动离线管理(ENABLE/DISABLE)，使用自动离线管理可以在节点出错离线后适时自动恢复，不需要软件干预。
+(12)	StdFiltersNbr：标准ID的缓冲区个数，最大可以为128个字。
 
-(8) AWUM
+(13)	ExtFiltersNbr：扩展ID的缓冲区个数，最大可以为128个字。
 
-..
+(14)	RxFifo0ElmtsNbr、RxFifo1ElmtsNbr：使用RXFIFO的个数，可配置为0~64个字节。
 
-   本成员用于设置是否使用自动唤醒功能(ENABLE/DISABLE)，使能自动唤醒功能后它会在监测到总线活动后自动唤醒。
+(15)	RxFifo0ElmtSize、RxFifo1ElmtSize：RXFIFO中的数据字段的大小，最大支持64字节。
 
-(9) ABOM
+(16)	RxBuffersNbr：要使用的接受缓冲区的个数，可配置为0~64个
 
-..
+(17)	RxBufferSize：接受缓冲区中数据的大小，最大支持64字节。
 
-   本成员用于设置是否使用自动离线管理功能(ENABLE/DISABLE)，使用自动离线管理可以在出错时离线后适时自动恢复，不需要软件干预。
+(18)	TxEventsNbr：发送事件缓冲区的个数。可选择0~32个
 
-(10) NART
+(19)	TxBuffersNbr：需要使用的发送缓冲区的的个数，最大可配置为64个。
 
-..
+(20)	TxFifoQueueElmtsNbr：发送FIFO或者队列的个数，可配置为0~32个
 
-   本成员用于设置是否使用自动重传功能(ENABLE/DISABLE)，使用自动重传功能时，会一直发送报文直到成功为止。
+(21)	TxFifoQueueMode：选择TX的缓冲区的功能，可配置为发送FIFO和发送队列。
 
-(11) RFLM
-
-..
-
-   本成员用于设置是否使用锁定接收FIFO(ENABLE/DISABLE)，锁定接收FIFO后，若FIFO溢出时会丢弃新数据，否则在FIFO溢出时以新数据覆盖旧数据。
-
-(12) TXFP
-
-..
-
-   本成员用于设置发送报文的优先级判定方法(ENABLE/DISABLE)，使能时，以报文存入发送邮箱的先后顺序来发送，否则按照报文ID的优先级来发送。
-
-配置完这些结构体成员后，我们调用库函数HAL_CAN_Init即可把这些参数写入到CAN控制寄存器中，实现CAN的初始化。
+(22)	TxElmtSize：配置发送的字节数，最大支持64字节
 
 CAN发送及接收结构体
 ~~~~~~~~~~~~~~~~~~~~~
@@ -795,83 +877,84 @@ CAN发送及接收结构体
    :name: 代码清单39_0_2
 
    /**
-      * @brief  CAN Tx message structure definition
-      * 发送结构体
+      * @brief  FDCAN Tx header structure definition
       */
    typedef struct {
-      uint32_t StdId;  /*存储报文的标准标识符11位，0-0x7FF. */
-      uint32_t ExtId;  /*存储报文的扩展标识符29位，0-0x1FFFFFFF. */
-      uint8_t IDE;     /*存储IDE扩展标志 */
-      uint8_t RTR;     /*存储RTR远程帧标志*/
-      uint8_t DLC;     /*存储报文数据段的长度，0-8 */
-      uint8_t Data[8]; /*存储报文数据段的内容 */
-   } CanTxMsgTypeDef;
-
+      uint32_t Identifier;          /*!< 存储报文的标识符*/
+      uint32_t IdType;              /*!< 标识符的类型，11bit或者是29bit*/
+      uint32_t TxFrameType;         /*!< 发送报文的类型 */
+      uint32_t DataLength;          /*!< 存储报文的长度，最大可以是64个字节 */
+      uint32_t ErrorStateIndicator; /*!< 错误状态标识符 */
+      uint32_t BitRateSwitch;       /*!< 数据段的位时序 */
+      uint32_t FDFormat;            /*!< FDCAN的数据格式 */
+      uint32_t TxEventFifoControl;  /*!<  发送事件FIFO使能*/
+      uint32_t MessageMarker;       /*!< 发送事件相关*/
+   } FDCAN_TxHeaderTypeDef;
    /**
-      * @brief  CAN Rx message structure definition
-      * 接收结构体
+      * @brief  FDCAN Rx header structure definition
       */
    typedef struct {
-      uint32_t StdId;  /*存储了报文的标准标识符11位，0-0x7FF. */
-      uint32_t ExtId;  /*存储了报文的扩展标识符29位，0-0x1FFFFFFF. */
-      uint8_t IDE;     /*存储了IDE扩展标志 */
-      uint8_t RTR;     /*存储了RTR远程帧标志*/
-      uint8_t DLC;     /*存储了报文数据段的长度，0-8 */
-      uint8_t Data[8]; /*存储了报文数据段的内容 */
-      uint8_t FMI;     /*存储了 本报文是由经过筛选器存储进FIFO的，0-0xFF */
-      uint8_t FIFONumber; /*配置接收FIFO编号，可以是CAN_FIFO0或者CAN_FIFO1 */
-   } CanRxMsgTypeDef;
+      uint32_t Identifier;            /*!< 存储报文的标识符*/
+      uint32_t IdType;                /*!< 标识符的类型，11bit或者是29bit*/
+      uint32_t RxFrameType;           /*!< 接受报文的类型*/
+      uint32_t DataLength;            /*!< 存储报文的长度，最大可以是64个字节 */
+      uint32_t ErrorStateIndicator;   /*!<  错误状态标识符 */
+      uint32_t BitRateSwitch;         /*!< 数据段的位时序 */
+      uint32_t FDFormat;              /*!< FDCAN的数据格式*/
+      uint32_t RxTimestamp;           /*!< 时间戳*/
+      uint32_t FilterIndex;           /*!< 接受ID段*/
+      uint32_t IsFilterMatchingFrame; /*!< 是否接受不匹配ID的数据帧*/
+   } FDCAN_RxHeaderTypeDef;
 
-这些结构体成员,说明如下：
+对比阅读，发送结构体与接收结构体是类似的，只是接收结构体多了RxTimestamp成员, FilterIndex成员 和IsFilterMatchingFrame成员，说明如下：
 
-(1) StdId
+(1)	Identifier
 
-..
+本成员存储的是报文的11位标准标识符，范围是0-0x7FF。或者是报文的29位扩展标识符，范围是0-0x1FFFFFFF。ExtId与StdId这两个成员根据下面的IDE位配置，只有一个是有效的。
 
-   本成员存储的是报文的11位标准标识符，范围是0-0x7FF。
+(2)	IdType
 
-(2) ExtId
+本成员存储的是扩展标志IDE位，当它的值为宏FDCAN_STANDARD_ID时表示本报文是标准帧，使用StdId成员存储报文ID；当它的值为宏FDCAN_EXTENDED_ID  时表示本报文是扩展帧，使用ExtId成员存储报文ID。
 
-..
+(3)	TxFrameType /RxFrameType
 
-   本成员存储的是报文的29位扩展标识符，范围是0-0x1FFFFFFF。ExtId与StdId这两个成员根据下面的IDE位配置，只有一个是有效的。
+本成员存储的是报文的类型，可以是数据帧或者是遥控帧。
 
-(3) IDE
+(4)	DataLength
 
-..
+本成员存储的是数据帧数据段的长度。最大可以是64个字节。
 
-   本成员存储的是扩展标志IDE位，当它的值为宏CAN_ID_STD时表示本报文是标准帧，使用StdId成员存储报文ID；当它的值为宏CAN_ID_EXT时表示本报文是扩展帧，使用ExtId成员存储报文ID。
+(5)	ErrorStateIndicator
 
-(4) RTR
+错误状态标识符。处于主动错误状态（FDCAN_ESI_ACTIVE）的节点，当检测到错误时将发送错误标志；处于被动错误状态（FDCAN_ESI_PASSIVE）的节点不能发送主动错误标志。
 
-..
+(6)	BitRateSwitch
 
-   本成员存储的是报文类型标志RTR位，当它的值为宏CAN_RTR_Data时表示本报文是数据帧；当它的值为宏CAN_RTR_Remote时表示本报文是遥控帧，由于遥控帧没有数据段，所以当报文是遥控帧时，下面的Data[8]成员的内容是无效的。
+本成员存储的是数据段的位时序切换功能。主要用于FDCAN的FFM模式。
 
-(5) DLC
+(7)	FDFormat
 
-..
+本成员存储的就是数据帧的数据格式。可以选择标准的CAN协议和FDCAN模式。
 
-   本成员存储的是数据帧数据段的长度，它的值的范围是0-8，当报文是遥控帧时DLC值为0。
+(8)	TxEventFifoControl
 
-(6) Data[8]
+本成员用于配置是否使用发送事件FIFO，发送事件FIFO主要用来存放一些消息的标志。
 
-..
+(9)	MessageMarker
 
-   本成员存储的就是数据帧中数据段的数据。
+本成员用来定义个消息的标志。假如使能了发送事件FIFO的功能，则该值会被拷贝到发送事件FIFO中。
 
-(7) FMI
+(10)	RxTimestamp
 
-..
+本成员只存在于接收结构体，它存储了FIFO的编号，表示本报文是存在哪个接收FIFO的。
 
-   本成员只存在于接收结构体，它存储了筛选器的编号，表示本报文是经过哪个筛选器存储进接收FIFO的，可以用它简化软件处理。
+(11)	FilterIndex
 
-(8) FIFONumber
+本成员只存在于接收结构体，用于设置筛选滤波器的编号。
 
-..
+(12)	IsFilterMatchingFrame
 
-   本成员只存在于接收结构体，它存储了FIFO的编号，表示本报文是存在哪个接收FIFO的。
-
+本成员只存在于接收结构体，用于设置是否接受ID不匹配的消息。
 
 当需要使用CAN发送报文时，先定义一个上面发送类型的结构体，然后把报文的内容按成员赋值到该结构体中，最后调用库函数CAN_Transmit把这些内容写入到发送邮箱即可把报文发送出去。
 
@@ -888,102 +971,49 @@ CAN的筛选器有多种工作模式，利用筛选器结构体可方便配置�
    :name: 代码清单39_0_3
 
    /**
-      * @brief  CAN filter init structure definition
-      * CAN筛选器结构体
-      */
+   * @brief  CAN filter init structure definition
+   * CAN筛选器结构体
+   */
    typedef struct {
-      uint32_t FilterIdHigh;         /*CAN_FxR1寄存器的高16位 */
-      uint32_t FilterIdLow;          /*CAN_FxR1寄存器的低16位*/
-      uint32_t FilterMaskIdHigh;     /*CAN_FxR2寄存器的高16位*/
-      uint32_t FilterMaskIdLow;      /*CAN_FxR2寄存器的低16位 */
-      uint32_t FilterFIFOAssignment; /*设置经过筛选后数据存储到哪个接收FIFO */
-      uint32_t FilterNumber;          /*筛选器编号，范围0-27*/
-      uint32_t FilterMode;            /*筛选器模式 */
-      uint32_t FilterScale;           /*设置筛选器的尺度 */
-      uint32_t FilterActivation; 	/*是否使能本筛选器*/
-      uint32_t BankNumber; 	/*扇区序号*/
-   } CAN_FilterInitTypeDef;
+      uint32_t IdType;           /*!< 识符的类型，11bit或者是29bit*/
+      uint32_t FilterIndex;      /*!< 筛选器编号*/
+      uint32_t FilterType;       /*!< 筛选器模式*/
+      uint32_t FilterConfig;     /*!< 设置经过筛选后数据存储到哪个接受FIFO*/
+      uint32_t FilterID1;        /*!< 筛选的ID*/
+      uint32_t FilterID2;        /*!< 筛选的ID */
+      uint32_t RxBufferIndex;    /*!< 选择存放在哪个接受缓冲区*/
+      uint32_t IsCalibrationMsg; /*!< 接受数据的类型*/
+   } FDCAN_FilterTypeDef;
 
-这些结构体成员都是“41.2.14验收筛选器”小节介绍的内容，可对比阅读，各个结构体成员的介绍如下：
+各个结构体成员的介绍如下：
 
-(1) FilterIdHigh
+(1)	IdType
 
-..
+IdType成员， 当它的值为宏FDCAN_STANDARD_ID时表示本报文是标准帧，使用StdId成员存储报文ID；当它的值为宏FDCAN_EXTENDED_ID  时表示本报文是扩展帧，使用ExtId成员存储报文ID。
 
-   FilterIdHigh成员用于存储要筛选的ID，若筛选器工作在32位模式，它存储的是所筛选ID的高16位；若筛选器工作在16位模式，它存储的就是一个完整的要筛选的ID。
+(2)	FilterIndex
 
-(2) FilterIdLow
+本成员用于设置筛选器的编号，即选择哪一组筛选器。如果是标准ID的话，选择0~127；如果是扩展ID的话，选择0~63。 
 
-..
+(3)	FilterType
 
-   类似地，
-   FilterIdLow成员也是用于存储要筛选的ID，若筛选器工作在32位模式，它存储的是所筛选ID的低16位；若筛选器工作在16位模式，它存储的就是一个完整的要筛选的ID。
+FilterType用于设置筛选器的工作模式，列表模式(宏CAN_FILTERMODE_IDLIST)及掩码模式(宏FDCAN_FILTER_MASK)
+	
+(4)	FilterConfig
 
-(3) FilterMaskIdHigh
+本成员主要用于设置经过筛选后的数据存储到哪一个接受FIFO，可以选择接受FIFO1，接收FIFO2，接受缓冲区等。请注意，如果选择接收缓冲区，则FilterType的值会被忽略，也就是FDCAN只会识别第一个ID。
 
-..
+(5)	FilterID1、FilterID2
 
-   FilterMaskIdHigh存储的内容分两种情况，当筛选器工作在标识符列表模式时，它的功能与FilterIdHigh相同，都是存储要筛选的ID；而当筛选器工作在掩码模式时，它存储的是FilterIdHigh成员对应的掩码，与FilterIdLow组成一组筛选器。
+本成员用于存储要筛选的ID。根据不同筛选方式，ID的值不同。
 
-(4) FilterMaskIdLow
+(6)	RxBufferIndex
 
-..
+本成员用于设置数据存放在哪一个接收缓冲区中，可选为0~63。
 
-   类似地，
-   FilterMaskIdLow存储的内容也分两种情况，当筛选器工作在标识符列表模式时，它的功能与FilterIdLow相同，都是存储要筛选的ID；而当筛选器工作在掩码模式时，它存储的是FilterIdLow成员对应的掩码，与FilterIdLow组成一组筛选器。
+(7)	IsCalibrationMsg
 
-上面四个结构体的存储的内容很容易让人糊涂，请结合前面的 图39_0_15_ 和下面的表
-39‑7理解，如果还搞不清楚，再结合库函数FilterInit的源码来分析。
-
-表 39‑7 不同模式下各结构体成员的内容
-
-============ ============= ============= ================= ===============
-模式         FilterIdHigh  FilterIdLow   FilterMaskIdHigh  FilterMaskIdLow
-32位列表模式 ID1的高16位   ID1的低16位   ID2的高16位       ID2的低16位
-16位列表模式 ID1的完整数值 ID2的完整数值 ID3的完整数值     ID4的完整数值
-32位掩码模式 ID1的高16位   ID1的低16位   ID1掩码的高16位   ID1掩码的低16位
-16位掩码模式 ID1的完整数值 ID2的完整数值 ID1掩码的完整数值 ID2掩码完整数值
-============ ============= ============= ================= ===============
-
-..
-
-   对这些结构体成员赋值的时候，还要注意寄存器位的映射，即注意哪部分代表STID，哪部分代表EXID以及IDE、RTR位。
-
-(5) FilterFIFOAssignment
-
-..
-
-   本成员用于设置当报文通过筛选器的匹配后，该报文会被存储到哪一个接收FIFO，它的可选值为FIFO0或FIFO1(宏CAN_FILTER_FIFO0/1)。
-
-(6) FilterNumber
-
-..
-
-   本成员用于设置筛选器的编号，即本过滤器结构体配置的是哪一组筛选器，CAN一共有28个筛选器，所以它的可输入参数范围为0-27。
-
-(7) FilterMode
-
-..
-
-   本成员用于设置筛选器的工作模式，可以设置为列表模式(宏CAN_FILTERMODE_IDLIST)及掩码模式(宏CAN_FILTERMODE_IDMASK)。
-
-(8) FilterScale
-
-..
-
-   本成员用于设置筛选器的尺度，可以设置为32位长(宏CAN_FILTERSCALE_32BIT)及16位长(宏CAN_FILTERSCALE_16BIT)。
-
-(9) FilterActivation
-
-..
-
-   本成员用于设置是否激活这个筛选器(宏ENABLE/DISABLE)。
-
-(10) BankNumber
-
-..
-
-   本成员用于设置选择启动从设备的扇区滤波器，可以输入参数范围为0-28，该设置只有CAN2适用。
+本成员用于设置筛选器的工作模式，可以设置为列表模式(宏CAN_FILTERMODE_IDLIST)及掩码模式(宏CAN_FILTERMODE_IDMASK)。
 
 配置完这些结构体成员后，我们调用库函数HAL_CAN_ConfigFilter即可把这些参数写入到筛选控制寄存器中，从而使用筛选器。我们前面说如果不理解那几个ID结构体成员存储的内容时，可以直接阅读库函数HAL_CAN_ConfigFilter的源代码理解，就是因为它直接对寄存器写入内容，代码的逻辑是非常清晰的。
 
@@ -1045,21 +1075,20 @@ CAN硬件相关宏定义
 .. code-block:: c
    :name: 代码清单39_0_4
 
-   #define CANx                       CAN1
-   #define CAN_CLK_ENABLE()           __CAN1_CLK_ENABLE()
-   #define CAN_RX_IRQ                 CAN1_RX0_IRQn
-   #define CAN_RX_IRQHandler          CAN1_RX0_IRQHandler
+   #define CANx                        FDCAN1
+   #define CAN_CLK_ENABLE()            __HAL_RCC_FDCAN_CLK_ENABLE()
+   #define CAN_RX_IRQ                  FDCAN1_IT0_IRQn
+   #define CAN_RX_IRQHandler           FDCAN1_IRQHandler
 
-   #define CAN_RX_PIN                 GPIO_PIN_8
-   #define CAN_TX_PIN                 GPIO_PIN_9
-   #define CAN_TX_GPIO_PORT           GPIOB
-   #define CAN_RX_GPIO_PORT           GPIOB
-   #define CAN_TX_GPIO_CLK_ENABLE()   __GPIOB_CLK_ENABLE()
-   #define CAN_RX_GPIO_CLK_ENABLE()   __GPIOB_CLK_ENABLE()
-   #define CAN_AF_PORT                GPIO_AF9_CAN1
+   #define CAN_RX_PIN                  GPIO_PIN_8
+   #define CAN_TX_PIN                  GPIO_PIN_9
+   #define CAN_TX_GPIO_PORT            GPIOB
+   #define CAN_RX_GPIO_PORT            GPIOB
+   #define CAN_TX_GPIO_CLK_ENABLE()    __GPIOB_CLK_ENABLE()
+   #define CAN_RX_GPIO_CLK_ENABLE()    __GPIOB_CLK_ENABLE()
+   #define CAN_AF_PORT                 GPIO_AF9_FDCAN1
 
-以上代码根据硬件连接，把与CAN通讯使用的CAN号
-、引脚号以及时钟都以宏封装起来，并且定义了接收中断的中断向量和中断服务函数，我们通过中断来获知接收FIFO的信息。注意在GPIO时钟部分我们还加入了AFIO时钟，这是为下面CAN进行复用功能重映射而设置的，当使用复用功能重映射时，必须开启AFIO时钟。
+以上代码根据硬件连接，把与CAN通讯使用的CAN号 、引脚号、引脚源以及复用功能映射都以宏封装起来，并且定义了接收中断的中断向量和中断服务函数，我们通过中断来获知接收FIFO的信息。
 
 初始化CAN的 GPIO
 ........................
@@ -1081,17 +1110,23 @@ CAN的GPIO初始化函数(bsp_can.c文件)
    static void CAN_GPIO_Config(void)
    {
       GPIO_InitTypeDef GPIO_InitStructure;
+      RCC_PeriphCLKInitTypeDef RCC_PeriphClkInit;
 
       /* 使能引脚时钟 */
       CAN_TX_GPIO_CLK_ENABLE();
       CAN_RX_GPIO_CLK_ENABLE();
 
+      /* Select PLL1Q as source of FDCANx clock */
+      RCC_PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_FDCAN;
+      RCC_PeriphClkInit.FdcanClockSelection = RCC_FDCANCLKSOURCE_PLL;
+      HAL_RCCEx_PeriphCLKConfig(&RCC_PeriphClkInit);
+
       /* 配置CAN发送引脚 */
       GPIO_InitStructure.Pin = CAN_TX_PIN;
       GPIO_InitStructure.Mode = GPIO_MODE_AF_PP;
-      GPIO_InitStructure.Speed = GPIO_SPEED_FAST;
+      GPIO_InitStructure.Speed = GPIO_SPEED_FREQ_HIGH;
       GPIO_InitStructure.Pull  = GPIO_PULLUP;
-      GPIO_InitStructure.Alternate =  GPIO_AF9_CAN1;
+      GPIO_InitStructure.Alternate =  GPIO_AF9_FDCAN1;
       HAL_GPIO_Init(CAN_TX_GPIO_PORT, &GPIO_InitStructure);
 
       /* 配置CAN接收引脚 */
@@ -1118,42 +1153,62 @@ CAN的GPIO初始化函数(bsp_can.c文件)
    static void CAN_Mode_Config(void)
    {
 
-      /************************CAN通信参数设置****************************/
+      /*********CAN通信参数设置*************/
       /* 使能CAN时钟 */
       CAN_CLK_ENABLE();
 
-      Can_Handle.Instance = CANx;
-      Can_Handle.pTxMsg = &TxMessage;
-      Can_Handle.pRxMsg = &RxMessage;
-      /* CAN单元初始化 */
-      Can_Handle.Init.TTCM=DISABLE;  //MCR-TTCM  关闭时间触发通信模式使能
-      Can_Handle.Init.ABOM=ENABLE;   //MCR-ABOM  自动离线管理
-      Can_Handle.Init.AWUM=ENABLE;   //MCR-AWUM  使用自动唤醒模式
-      Can_Handle.Init.NART=DISABLE;//MCR-NART  禁止报文自动重传DISABLE-自动重传
-      Can_Handle.Init.RFLM=DISABLE; //MCR-RFLM  接收FIFO 锁定模式DISABLE-溢出时新报文会覆盖原有报文
-      Can_Handle.Init.TXFP=DISABLE; //MCR-TXFP 发送FIFO优先级DISABLE-优先级取决于报文标示符
-      Can_Handle.Init.Mode = CAN_MODE_NORMAL;  //正常工作模式
-      Can_Handle.Init.SJW=CAN_SJW_1TQ;   //BTR-SJW 重新同步跳跃宽度 2个时间单元
-
-      /* ss=1 bs1=5 bs2=3 位时间宽度为(1+5+3) 波特率即为时钟周期tq*(1+3+6)  */
-      Can_Handle.Init.BS1=CAN_BS1_5TQ;     //BTR-TS1 时间段1 占用了6个时间单元
-      Can_Handle.Init.BS2=CAN_BS2_3TQ;     //BTR-TS1 时间段2 占用了3个时间单元
-
-   /* CAN Baudrate = 1 MBps (1MBps已为stm32的CAN最高速率) (CAN 时钟频率为 APB 1 = 45 MHz) */
-      Can_Handle.Init.Prescaler =6; //BTR-BRP 波特率分频器定义了时间单元的时间长度 45/(1+5+3)/5=1 Mbps
-      HAL_CAN_Init(&Can_Handle);
+      /* 初始化FDCAN外设工作在环回模式 */
+      hfdcan.Instance = CANx;
+      hfdcan.Init.FrameFormat = FDCAN_FRAME_CLASSIC;
+      hfdcan.Init.Mode = FDCAN_MODE_NORMAL;
+      hfdcan.Init.AutoRetransmission = ENABLE;
+      hfdcan.Init.TransmitPause = DISABLE;
+      hfdcan.Init.ProtocolException = ENABLE;
+      /* 位时序配置:
+         ************************
+         位时序参数             | Nominal      |  Data
+         ----------------------|--------------|----------------
+         CAN子系统内核时钟输入  | 40 MHz       | 40 MHz
+         时间常量 (tq)         | 25 ns        | 25 ns
+         同步段               | 1 tq         | 1 tq
+         传播段               | 23 tq        | 23 tq
+         相位段1                | 8 tq         | 8 tq
+         相位段2                | 8 tq         | 8 tq
+         同步跳转宽度          | 8 tq         | 8 tq
+         位长度                 | 40 tq = 1 us | 40 tq = 1 us
+         位速率                 | 1 MBit/s     | 1 MBit/s
+      */
+      hfdcan.Init.NominalPrescaler=0x1; /*tq=ominalPrescalerx(1/40MHz) */
+      hfdcan.Init.NominalSyncJumpWidth = 0x8;
+      hfdcan.Init.NominalTimeSeg1=0x1F;/*NominalTimeSeg1=传播段+相位段1 */
+      hfdcan.Init.NominalTimeSeg2 = 0x8;
+      hfdcan.Init.MessageRAMOffset = 0;
+      hfdcan.Init.StdFiltersNbr = 1;
+      hfdcan.Init.ExtFiltersNbr = 1;
+      hfdcan.Init.RxFifo0ElmtsNbr = 1;
+      hfdcan.Init.RxFifo0ElmtSize = FDCAN_DATA_BYTES_8;
+      hfdcan.Init.RxFifo1ElmtsNbr = 2;
+      hfdcan.Init.RxFifo1ElmtSize = FDCAN_DATA_BYTES_8;
+      hfdcan.Init.RxBuffersNbr = 1;
+      hfdcan.Init.RxBufferSize = FDCAN_DATA_BYTES_8;
+      hfdcan.Init.TxEventsNbr = 2;
+      hfdcan.Init.TxBuffersNbr = 1;
+      hfdcan.Init.TxFifoQueueElmtsNbr = 2;
+      hfdcan.Init.TxFifoQueueMode = FDCAN_TX_FIFO_OPERATION;
+      hfdcan.Init.TxElmtSize = FDCAN_DATA_BYTES_8;
+      HAL_FDCAN_Init(&hfdcan);
    }
 
 这段代码主要是把CAN的模式设置成了正常工作模式，如果您阅读的是“CAN—回环测试”的工程，这里是被配置成回环模式的，除此之外，两个工程就没有其它差别了。
 
-代码中还把位时序中的BS1和BS2段分别设置成了5Tq和3Tq，再加上SYNC_SEG段，
-一个CAN数据位就是9Tq了，加上CAN外设的分频配置为6分频，
+代码中还把位时序中的BS1和BS2段分别设置成了31Tq和8Tq，再加上SYNC_SEG段，
+一个CAN数据位就是40Tq了，加上CAN外设的分频配置为1分频，
 CAN所使用的总线时钟f\ :sub:`APB1`
-= 45MHz，于是我们可计算出它的波特率：
+= 40MHz，于是我们可计算出它的波特率：
 
-   1Tq = 1/(45M/6)=1/9 us
+   1Tq = 1/(40M)=1/40 us
 
-   T\ :sub:`1bit`\ =(5+3+1) x Tq =1us
+   T\ :sub:`1bit`\ =(31+8+1) x Tq =1us
 
    波特率=1/T\ :sub:`1bit` =1Mbps
 
@@ -1177,73 +1232,19 @@ CAN所使用的总线时钟f\ :sub:`APB1`
    */
    static void CAN_Filter_Config(void)
    {
-      CAN_FilterConfTypeDef  CAN_FilterInitStructure;
-
-      /*CAN筛选器初始化*/
-      CAN_FilterInitStructure.FilterNumber=0;           //筛选器组0
-      CAN_FilterInitStructure.FilterMode=CAN_FILTERMODE_IDMASK; //工作在掩码模式
-      CAN_FilterInitStructure.FilterScale=CAN_FILTERSCALE_32BIT;//筛选器位宽为单个32位。
-      /*
-      使能筛选器，按照标志的内容进行比对筛选，扩展ID不是如下的就抛弃掉，是的话，会存
-      入FIFO0。 */
-
-      CAN_FilterInitStructure.FilterIdHigh= ((((uint32_t)0x1314<<3)|
-      CAN_ID_EXT|CAN_RTR_DATA)&0xFFFF0000)>>16;   //要筛选的ID高位
-      CAN_FilterInitStructure.FilterIdLow= (((uint32_t)0x1314<<3)|
-      CAN_ID_EXT|CAN_RTR_DATA)&0xFFFF; //要筛选的ID低位
-      CAN_FilterInitStructure.FilterMaskIdHigh= 0xFFFF;//筛选器高16位每位必须匹配
-      CAN_FilterInitStructure.FilterMaskIdLow= 0xFFFF;//筛选器低16位每位必须匹配
-      CAN_FilterInitStructure.FilterFIFOAssignment=CAN_FILTER_FIFO0;//筛选器被关联到FIFO0
-      CAN_FilterInitStructure.FilterActivation=ENABLE;      //使能筛选器
-      HAL_CAN_ConfigFilter(&Can_Handle,&CAN_FilterInitStructure);
+      FDCAN_FilterTypeDef  sFilterConfig;
+   
+      /* 配置标准ID接收过滤器到Rx缓冲区0 */
+      sFilterConfig.IdType = FDCAN_EXTENDED_ID;
+      sFilterConfig.FilterIndex = 0;
+      sFilterConfig.FilterType = FDCAN_FILTER_DUAL;
+      sFilterConfig.FilterConfig = FDCAN_FILTER_TO_RXBUFFER;
+      sFilterConfig.FilterID1 = 0x1314;
+      sFilterConfig.FilterID2 = 0x2568;
+      sFilterConfig.RxBufferIndex = 0;
+      HAL_FDCAN_ConfigFilter(&hfdcan, &sFilterConfig);
+   
    }
-
-这段代码把筛选器第0组配置成了32位的掩码模式，并且把它的输出连接到接收FIFO0，若通过了筛选器的匹配，报文会被存储到接收FIFO0。
-
-筛选器配置的重点是配置ID和掩码，根据我们的配置，这个筛选器工作在 图39_0_17_ 中的模式。
-
-.. image:: media/image17.jpeg
-   :align: center
-   :alt: 图 39‑17 一个32位的掩码模式筛选器
-   :name: 图39_0_17
-
-图 39‑17 一个32位的掩码模式筛选器
-
-在该配置中，结构体成员FilterIdHigh和FilterIdLow存储的是要筛选的ID，而FilterMaskIdHigh和FilterMaskIdLow存储的是相应的掩码。在赋值时，要注意寄存器位的映射，在32位的ID中，第0位是保留位，第1位是RTR标志，第2位是IDE标志，从第3位起才是报文的ID(扩展ID)。
-
-因此在上述代码中我们先把扩展ID“0x1314”、IDE位标志“宏CAN_ID_EXT”以及RTR位标志“宏CAN_RTR_DATA”根据寄存器位映射组成一个32位的数据，然后再把它的高16位和低16位分别赋值给结构体成员FilterIdHigh和FilterIdLow。
-
-而在掩码部分，为简单起见我们直接对所有位赋值为1，表示上述所有标志都完全一样的报文才能经过筛选，所以我们这个配置相当于单个ID列表的模式，只筛选了一个ID号，而不是筛选一组ID号。这里只是为了演示方便，实际使用中一般会对不要求相等的数据位赋值为0，从而过滤一组ID，如果有需要，还可以继续配置多个筛选器组，最多可以配置28个，代码中只是配置了筛选器组0。
-
-对结构体赋值完毕后调用库函数HAL_CAN_ConfigFilter把个筛选器组的参数写入到寄存器中。
-
-配置接收中断
-...............
-
-当FIFO0接收到数据时会引起中断，该接收中断的优先级配置如下，见 代码清单39_0_7_。
-
-代码清单39_0_7 配置CAN接收中断的优先级(bsp_can.c文件)
-
-.. code-block:: c
-   :name: 代码清单39_0_7
-
-   /*
-   * 函数名：CAN_NVIC_Config
-   * 描述  ：CAN的NVIC 配置,第1优先级组，0，0优先级
-   * 输入  ：无
-   * 输出  : 无
-   * 调用  ：内部调用
-   */
-   static void CAN_NVIC_Config(void)
-   {
-      /* 配置抢占优先级的分组 */
-      HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_1);
-      /*中断设置，抢占优先级0，子优先级为0*/
-      HAL_NVIC_SetPriority(CAN_RX_IRQ, 0 ,0);
-      HAL_NVIC_EnableIRQ(CAN_RX_IRQ);
-   }
-
-这部分与我们配置其它中断的优先级无异，都是配置NVIC结构体，优先级可根据自己的需要配置，最主要的是中断向量，上述代码中把中断向量配置成了CAN的接收中断。
 
 设置发送报文
 ...............
@@ -1264,17 +1265,23 @@ CAN所使用的总线时钟f\ :sub:`APB1`
    */
    void CAN_SetMsg(void)
    {
-      uint8_t ubCounter = 0;
-      Can_Handle.pTxMsg->StdId=0x00;
-      Can_Handle.pTxMsg->ExtId=0x1314;           //使用的扩展ID
-      Can_Handle.pTxMsg->IDE=CAN_ID_EXT;          //扩展模式
-      Can_Handle.pTxMsg->RTR=CAN_RTR_DATA;         //发送的是数据
-      Can_Handle.pTxMsg->DLC=8;              //数据长度为8字节
+      FDCAN_TxHeaderTypeDef TxHeader;
+      /* 配置Tx缓冲区消息 */
+      TxHeader.Identifier = 0x1314;
+      TxHeader.IdType = FDCAN_EXTENDED_ID;
+      TxHeader.TxFrameType = FDCAN_DATA_FRAME;
+      TxHeader.DataLength = FDCAN_DLC_BYTES_8;
+      TxHeader.ErrorStateIndicator = FDCAN_ESI_ACTIVE;
+      TxHeader.BitRateSwitch = FDCAN_BRS_OFF;
+      TxHeader.FDFormat = FDCAN_FD_CAN;
+      TxHeader.TxEventFifoControl = FDCAN_STORE_TX_EVENTS;
+      TxHeader.MessageMarker = 0x01;
+      HAL_FDCAN_AddMessageToTxBuffer(&hfdcan, &TxHeader, TxData0, FDCAN_TX_BUFFER0);
 
-      /*设置要发送的数据0-7*/
-      for (ubCounter = 0; ubCounter < 8; ubCounter++) {
-         Can_Handle.pTxMsg->Data[ubCounter] = ubCounter;
-      }
+      /* 启动FDCAN模块 */
+      HAL_FDCAN_Start(&hfdcan);
+      /* 发送缓冲区消息 */
+      HAL_FDCAN_EnableTxBufferRequest(&hfdcan, FDCAN_TX_BUFFER0);
    }
 
 这段代码是我们为了方便演示而自己定义的设置报文内容的函数，它把报文设置成了扩展模式的数据帧，扩展ID为0x1314，数据段的长度为8，且数据内容分别为0-7，实际应用中您可根据自己的需求发设置报文内容。当我们设置好报文内容后，调用库函数HAL_CAN_Transmit_IT即可把该报文存储到发送邮箱，然后CAN外设会把它发送出去。
@@ -1282,34 +1289,26 @@ CAN所使用的总线时钟f\ :sub:`APB1`
 接收报文
 ..............
 
-由于我们设置了接收中断，所以接收报文的操作是在中断的服务函数中完成的，
-见 代码清单39_0_9_。
+接收报文是在主函数中进行轮询。一旦NDATn（n=1，2）中的相应为被置1，则说明接收到新的数据。 代码清单39_0_9_。
 
-代码清单39_0_9 接收报文(stm32F7xx_it.c)
+代码清单39_0_9 接收报文(main.c)
 
 .. code-block:: c
    :name: 代码清单39_0_9
 
-   /**
-   * @brief  CAN接收完成中断(非阻塞)
-   * @param  hcan: CAN句柄指针
-   * @retval 无
-   */
-   void HAL_CAN_RxCpltCallback(CAN_HandleTypeDef* hcan)
+   if (HAL_FDCAN_IsRxBufferMessageAvailable(&hfdcan,FDCAN_RX_BUFFER0))
    {
-      /* 比较ID是否为0x1314 */
-      if ((hcan->pRxMsg->ExtId==0x1314) && (hcan->pRxMsg->IDE==CAN_ID_EXT)
-      && (hcan->pRxMsg->DLC==8) ) {    flag = 1; //接收成功
-      } else {
-         flag = 0; //接收失败
-      }
-      /* 准备中断接收 */
-      HAL_CAN_Receive_IT(&Can_Handle, CAN_FIFO0);
+      /* 接收消息 */
+      HAL_FDCAN_GetRxMessage(&hfdcan, FDCAN_RX_BUFFER0, &RxHeader, RxData);
+      /*接收成功*/
+      LED_GREEN;
+      printf("\r\nCAN接收到数据：\r\n");
+      CAN_DEBUG_ARRAY(RxData,8);
+      HAL_Delay(100);
+      LED_RGBOFF;
    }
 
-根据我们前面的配置，若CAN接收的报文经过筛选器匹配后会被存储到FIFO0中，并引起中断进入到这个中断服务函数中，在这个函数里我们调用了库函数HAL_CAN_Receive_IT把报文从FIFO复制到接收报文结构体CanRxMsgTypeDef中，并且比较了接收到的报文ID是否与我们希望接收的一致，若一致就设置标志flag=1，否则为0，通过flag标志通知主程序流程获知是否接收到数据。
-
-要注意如果设置了接收报文中断，必须要在中断内调用HAL_CAN_Receive_IT函数读取接收FIFO的内容，因为只有这样才能清除该FIFO的接收中断标志，如果不在中断内调用它清除标志的话，一旦接收到报文，STM32会不断进入中断服务函数，导致程序卡死。
+根据我们前面的配置，若CAN接收的报文经过筛选器匹配后会被存储到FIFO0中，我们调用了库函数HAL_FDCAN_GetRxMessage把报文从FIFO复制到接收报文RxData中。 
 
 main函数
 ''''''''''
@@ -1321,70 +1320,70 @@ main函数
 .. code-block:: c
    :name: 代码清单39_0_10
 
-   __IO uint32_t flag = 0;    //用于标志是否接收到数据，在中断函数中赋值
    /**
-   * @brief  主函数
-   * @param  无
-   * @retval 无
-   */
+      * @brief  主函数
+      * @param  无
+      * @retval 无
+      */
    int main(void)
    {
-      /* 配置系统时钟为216 MHz */
+      /* 使能指令缓存 */
+      SCB_EnableICache();
+      /* 使能数据缓存 */
+      SCB_EnableDCache();
+      /* 系统时钟初始化成400MHz */
       SystemClock_Config();
-      /* 初始化LED */
+      /* LED 端口初始化 */
       LED_GPIO_Config();
-      /* 初始化调试串口，一般为串口1 */
-      UARTx_Config();
-      /*初始化can,在中断接收CAN数据包*/
+      LED_BLUE;
+   
+      /* 配置串口1为：115200 8-N-1 */
+      DEBUG_USART_Config();
+      /* 初始化独立按键 */
+      Key_GPIO_Config();
+   
       CAN_Config();
-
-      printf("\r\n 欢迎使用野火  STM32 H743 开发板。\r\n");
+      printf("\r\n欢迎使用野火  STM32 H743 开发板。\r\n");
       printf("\r\n 野火H743 CAN通讯实验例程\r\n");
-
       printf("\r\n 实验步骤：\r\n");
-
+   
       printf("\r\n 1.使用导线连接好两个CAN讯设备\r\n");
       printf("\r\n 2.使用跳线帽连接好:5v --- C/4-5V \r\n");
-      printf("\r\n 3.按下开发板的KEY1键，会使用CAN向外发送0-7的数据包，包的扩展ID为0x1314 \r\n");
-      printf("\r\n 4.若开发板的CAN接收到扩展ID为0x1314的数据包，会把数据以打印到串口。 \r\n");
-      printf("\r\n 5.本例中的can波特率为1MBps，为stm32的can最高速率。 \r\n");
+      printf("\r\n 3.按下开发板的KEY1键，会使用CAN向外发送0- 11的数据包，包的扩展ID为0x1314 \r\n");
+      printf("\r\n 4.若开发板的CAN接收到扩展ID为0x1314的数据包，会把数据以打印到串口 \r\n");
+      printf("\r\n 5.本例中的can波特率为1MBps。 \r\n");
       while (1) {
-         /*按一次按键发送一次数据*/
-         if (  Key_Scan(KEY1_GPIO_PORT,KEY1_PIN) == KEY_ON) {
+            /*按一次按键发送一次数据*/
+            if (  Key_Scan(KEY1_GPIO_PORT,KEY1_PIN) == KEY_ON) {
                LED_BLUE;
                /* 装载一帧数据 */
                CAN_SetMsg();
-               /* 开始发送数据 */
-               HAL_CAN_Transmit_IT(&Can_Handle);
                HAL_Delay(100);
                LED_RGBOFF;
-         }
-         if (flag==1) {
-               /*发送成功*/
+            }
+            if (HAL_FDCAN_IsRxBufferMessageAvailable
+         (&hfdcan,FDCAN_RX_BUFFER0)) {
+               /* 接收消息 */
+               HAL_FDCAN_GetRxMessage(&hfdcan, FDCAN_RX_BUFFER0, &RxHeader, RxData);
+               /*接收成功*/
                LED_GREEN;
                printf("\r\nCAN接收到数据：\r\n");
-               CAN_DEBUG_ARRAY(Can_Handle.pRxMsg->Data,8);
-               flag=0;
+               CAN_DEBUG_ARRAY(RxData,8);
                HAL_Delay(100);
                LED_RGBOFF;
-         }
+            }
       }
    }
 
+在main函数里，我们调用了CAN_Config函数初始化CAN外设，它包含我们前面解说的GPIO初始化函数CAN_GPIO_Config、工作模式设置函数CAN_Mode_Config以及筛选器配置函数CAN_Filter_Config，最后启动中断接收数据。
 
-在main函数里，我们调用了CAN_Config函数初始化CAN外设，它包含我们前面解说的GPIO初始化函数CAN_GPIO_Config、中断优先级设置函数CAN_NVIC_Config、工作模式设置函数CAN_Mode_Config以及筛选器配置函数CAN_Filter_Config。
+初始化完成后，我们在while循环里检测按键，当按下实验板的按键1时，它就调用CAN_SetMsg函数设置要发送的报文，然后调用HAL_FDCAN_EnableTxBufferRequest函数把该报文存储到发送邮箱，等待CAN外设把它发送出去。代码中并没有检测发送状态，如果需要，您可以调用库函数HAL_CAN_GetState检查发送状态。
 
-初始化完成后，我们在while循环里检测按键，当按下实验板的按键1时，它就调用CAN_SetMsg函数设置要发送的报文，然后调用HAL_CAN_Transmit_IT函数把该报文存储到发送邮箱，等待CAN外设把它发送出去。代码中并没有检测发送状态，如果需要，您可以调用库函数HAL_CAN_GetState检查发送状态。
-
-while循环中在其它时间一直检查flag标志，当接收到报文时，我们的中断服务函数会把它置1，所以我们可以通过它获知接收状态，当接收到报文时，我们把它使用宏CAN_DEBUG_ARRAY输出到串口。
+在while循环中调用函数HAL_FDCAN_IsRxBufferMessageAvailable进行检测是否收到报文，当接收到报文时，我们把它使用宏CAN_DEBUG_ARRAY输出到串口，并把它保存到数组RxData。
 
 下载验证
 ^^^^^^^^
 
-下载验证这个CAN实验时，我们建议您先使用“CAN—回环测试”的工程进行测试，它的环境配置比较简单，只需要一个实验板，用USB线使实验板“USB
-TO
-UART”接口跟电脑连接起来，在电脑端打开串口调试助手，并且把编译好的该工程下载到实验板，然后复位。这时在串口调试助手可看到CAN测试的调试信息，按一下实验板上的KEY1按键，实验板会使用回环模式向自己发送报文，在串口调试助手可以看到相应的发送和接收的信息。
+下载验证这个CAN实验时，我们建议您先使用“CAN—回环测试”的工程进行测试，它的环境配置比较简单，只需要一个实验板，用USB线使实验板“USB TO UART”接口跟电脑连接起来，在电脑端打开串口调试助手，并且把编译好的该工程下载到实验板，然后复位。这时在串口调试助手可看到CAN测试的调试信息，按一下实验板上的KEY1按键，实验板会使用回环模式向自己发送报文，在串口调试助手可以看到相应的发送和接收的信息。
 
-使用回环测试成功后，如果您有两个实验板，需要按照“硬件设计”小节中的图例连接两个板子的CAN总线，并且一定要接上跳线帽给CAN收发器供电、把液晶屏拔掉防止干扰。用USB线使实验板“USB
-TO
-UART”接口跟电脑连接起来，在电脑端打开串口调试助手，然后使用“CAN—双机通讯”工程编译，并给两个板子都下载该程序，然后复位。这时在串口调试助手可看到CAN测试的调试信息，按一下其中一个实验板上的KEY1按键，另一个实验板会接收到报文，在串口调试助手可以看到相应的发送和接收的信息，LED灯也有相应的提示，蓝灯闪烁表示已经发送信息，绿灯闪烁表示成功接收到信息。
+使用回环测试成功后，如果您有两个实验板，需要按照“硬件设计”小节中的图例连接两个板子的CAN总线，并且一定要接上跳线帽给CAN收发器供电、把液晶屏拔掉防止干扰。用USB线使实验板“USB TO UART”接口跟电脑连接起来，在电脑端打开串口调试助手，然后使用“CAN—双机通讯”工程编译，并给两个板子都下载该程序，然后复位。这时在串口调试助手可看到CAN测试的调试信息，按一下其中一个实验板上的KEY1按键，另一个实验板会接收到报文，在串口调试助手可以看到相应的发送和接收的信息，LED灯也有相应的提示，蓝灯闪烁表示已经发送信息，绿灯闪烁表示成功接收到信息。

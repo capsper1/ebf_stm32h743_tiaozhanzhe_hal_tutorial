@@ -1,8 +1,7 @@
 I2S—音频播放与录音输入
 ----------------------
 
-本章参考资料：《STM32H74xxx参考手册》、《STM32F7xx规格书》、
-库帮助文档《STM32F779xx_User_Manual.chm》及《I2S BUS》。
+本章参考资料：《STM32H743用户手册》、《STM32H743xI规格书》、库帮助文档《STM32H753xx_User_Manual.chm》及《I2S BUS》。
 
 若对I2S通讯协议不了解，可先阅读《I2S BUS》文档的内容学习。
 
@@ -52,7 +51,7 @@ WM8978芯片是一个音频编译码器，但本身没有保存音频数据功�
 I2S总线接口
 ^^^^^^^^^^^
 
-I2S总线接口有3个主要信号，STM32F4xx只能实现数据半双工传输。
+STM32h7xx的I2S总线接口有3个主要信号： 
 
 (1) SD(Serial
     Data)：串行数据线，用于发送或接收两个时分复用的数据通道上的数据。
@@ -161,7 +160,7 @@ STM32H743x系列控制器有三个I2S，I2S1、I2S2和I2S3，三个的资源是�
 I2S的SD映射到SPI的MOSI引脚，ext_SD映射到SPI的MISO引脚，WS映射到SPI的NSS引脚，CK映射到SPI的SCK引脚。MCK是I2S专用引脚，用于主模式下输出时钟或在从模式下输入时钟。I2S时钟发生器可以由控制器内部时钟源分频产生，亦可采用CKIN引脚输入时钟分频得到，一般使用内部时钟源即可。控制器I2S引脚分布参考表
 36-0‑1。
 
-表 36-0‑1 STM32f4xx系列控制器I2S引脚分布
+表 36-0‑1 STM32H743x系列控制器I2S引脚分布
 
 +------+---------------+-----------------------+------------------+
 | 引脚 |     I2S1      |         I2S2          |       I2S3       |
@@ -192,9 +191,9 @@ I2S的逻辑控制通过设置相关寄存器位实现，比如通过配置SPI_I
 
 I2S比特率用来确定I2S数据线上的数据流和I2S时钟信号频率。I2S比特率=每个通道的位数×通道数×音频采样频率。
 
-图36_0_8_ 为I2S时钟发生器内部结构图。
-I2SxCLK(x可选2或3)可以通过RCC_CFGR寄存器的I2SSRC位选择使用PLLI2S时钟作为I2S时钟源或I2S_CKIN引脚输入时钟作为I2S时钟源。
-一般选择内部PLLI2S(通过R分频系数)作为时钟源。例程程序设置PLLI2S时钟为258MHz，R分频系数为3，此时I2SxCLK时钟为86MHz。
+图36_0_8_ 为I2S时钟发生器内部结构图。I2SxCLK(x可选2或3)可以选择使用PLL1Q时钟作为I2S时钟源或I2S_CKIN引脚输入时钟作为I2S时钟源。
+一般选择内部PLL2P (通过P分频系数)作为时钟源。
+例程程序设置PLL2P时钟为400MHz，R分频系数为5，此时I2SxCLK时钟为80MHz。
 
 .. image:: media/image8.png
    :align: center
@@ -418,8 +417,61 @@ I2S初始化结构体详解
 
 HAL库函数对I2S外设建立了一个初始化结构体I2S_InitTypeDef。初始化结构体成员用于设置I2S工作环境参数，并由I2S相应初始化配置函数HAL_I2S_Init调用，这些设定参数将会设置I2S相应的寄存器，达到配置I2S工作环境的目的。
 
-初始化结构体和初始化库函数配合使用是HAL库精髓所在，理解了初始化结构体每个成员意义基本上就可以对该外设运用自如了。初始化结构体定义在stm32f7xx_hal_spi.h文件中，初始化库函数定义在stm32f7xx_hal_spi.c文件中，编程时我们可以结合这两个文件内注释使用。
+初始化结构体和初始化库函数配合使用是标准库精髓所在，理解了初始化结构体每个成员意义基本上就可以对该外设运用自如了。初始化结构体定义在stm32h7xx_hal_i2s.h文件中，初始化库函数定义在stm32h7xx_hal_i2s.c文件中，编程时我们可以结合这两个文件内注释使用。
 
+代码清单 I2S外设管理结构体（文件stm32h7xx_hal_i2s.h）
+
+.. code-block:: c
+
+    typedef struct __I2S_HandleTypeDef {
+        SPI_TypeDef               *Instance;                 /*!< I2S的外设寄存器基地址*/
+        I2S_InitTypeDef            Init;                     /*!< I2S初始化结构体*/
+        uint16_t                  *pTxBuffPtr;               /*!< I2S发送数据的地址*/
+        __IO uint16_t              TxXferSize;               /*!< I2S发送数据的大小*/
+        __IO uint16_t              TxXferCount;              /*!< I2S发送数据的个数*/
+        uint16_t                  *pRxBuffPtr;               /*!< I2S接受数据的地址*/
+        __IO uint16_t              RxXferSize;               /*!< I2S接受数据的大小*/
+        __IO uint16_t              RxXferCount;              /*!< I2S接受数据的个数*/
+        void (*RxISR)(struct __I2S_HandleTypeDef *hi2s);     /*!< I2SRX回调函数*/
+        void (*TxISR)(struct __I2S_HandleTypeDef *hi2s);     /*!< I2STX回调函数*/
+        DMA_HandleTypeDef         *hdmatx;                   /*!< I2S发送DMA配置结构体*/
+        DMA_HandleTypeDef         *hdmarx;                   /*!< I2S接收DMA配置结构体*/
+        __IO HAL_LockTypeDef       Lock;                     /*!< I2S锁资源*/
+        __IO HAL_I2S_StateTypeDef  State;                    /*!< I2S工作状态*/
+        __IO uint32_t              ErrorCode;                /*!< I2S错误操作返回值*/
+    } I2S_HandleTypeDef;
+
+(1)	Instance基地址：I2S 寄存器基地址指针，所有参数都是指定基地址后才能正确写入寄存器。
+
+(2)	Init初始化结构体：I2S 的初始化结构体，下面会详细讲解每一个成员。
+
+(3)	pTxBuffPtr：用来存放发送数据地址的指针。
+
+(4)	TxXferSize：用来指定需要发送数据的大小。
+
+(5)	TxXferCount：用来指定发送数据的个数
+
+(6)	pRxBuffPtr：用来存放接受数据地址的指针。
+
+(7)	RxXferSize：用来指定需要接受数据的大小。
+
+(8)	RxXferCount：用来指定接受数据的个数
+
+(9)	RxISR：用于存放RX中断服务函数地址的指针
+
+(10) TxISR：用于存放TX中断服务函数地址的指针
+
+(11) hdmatx：I2S的发送DMA外设管理结构体，用来配置发送的DMA的请求和DMA的相关参数
+
+(12) hdmarx：I2S的接收DMA外设管理结构体，用来配置接收的DMA的请求和DMA的相关参数
+
+(13) Lock：SDMMC锁资源。
+
+(14) State：I2S的工作状态，正常工作的话，处于HAL_I2S_STATE_BUSY状态。出现等待超时，则会处于HAL_I2S_STATE_TIMEOUT状态。
+
+(15) ErrorCode：SD卡的错误操作值，提供给用户排查错误。
+
+I2S的外设管理结构体的配置，我们一般只需要配置好I2S的外设寄存器基地址以及初始化结构体就可以了。其余的成员变量一般都是调用某个HAL库函数时，函数内部会自动赋值，因此，我们不需要关心这部分的配置。
 I2S初始化结构体用于配置I2S基本工作环境，比如I2S工作模式、通信标准选择等等。它被I2S_Init函数调用。
 
 代码清单36_0_1 I2S_InitTypeDef结构体
@@ -428,33 +480,46 @@ I2S初始化结构体用于配置I2S基本工作环境，比如I2S工作模式�
    :name: 代码清单36_0_1
 
     typedef struct {
-        uint32_t Mode;        // I2S模式选择
-        uint32_t Standard;    // I2S标准选择
-        uint32_t DataFormat;  // 数据格式
-        uint32_t MCLKOutput;  // 主时钟输出使能
-        uint32_t AudioFreq;   // 采样频率
-        uint32_t CPOL;        // 空闲电平选择
-    } I2S_InitTypeDef;
+        uint32_t Mode;               /*!< I2S模式选择 */
+        uint32_t Standard;           /*!< I2S标准选择*/
+        uint32_t DataFormat;         /*!< 数据格式*/
+        uint32_t MCLKOutput;         /*!< 主时钟输出使能*/
+        uint32_t AudioFreq;          /*!< 采样频率*/
+        uint32_t CPOL;               /*!< 空闲电平选择*/
+        uint32_t FirstBit;           /*!< 高位（MSB）或者低位（LSB）先行 */
+        uint32_t WSInversion;        /*!< 数据转换顺序*/
+        uint32_t IOSwap;             /*!< 交换MOSI和MISO*/
+        uint32_t Data24BitAlignment; /*!< 24位数据的对齐方式 */
+        uint32_t FifoThreshold;      /*!< FIFO阈值*/
+        uint32_t MasterKeepIOState;  /*!< 主机模式下，保持输入输出状态*/
+        uint32_t SlaveExtendFREDetection; /*!< 控制从机模式下的通道长度*/
+    } I2S_InitTypeDef; 
 
-(1) Mode：I2S模式选择，可选主机发送、主机接收、从机发送以及从机接收模式，
-    它设定SPI_I2SCFGR寄存器I2SCFG位的值。一般设置STM32控制器为主机模式，
-    当播放声音时选择发送模式；当录制声音时选择接收模式。
+(1)	Mode：I2S模式选择，可选主机发送、主机接收、从机发送，从机接收模式，从机全双工和主机全双工。它设定SPI_I2SCFGR寄存器I2SCFG位的值。一般设置STM32控制器为主机模式，当播放声音时选择发送模式；当录制声音时选择接收模式。
 
-(2) Standard：通信标准格式选择，可选I2S
-    Philips标准、左对齐标准、右对齐标准、PCM短帧标准或PCM长帧标准，它设定SPI_I2SCFGR寄存器I2SSTD位和PCMSYNC位的值。一般设置为I2S
-    Philips标准即可。
+(2)	Standard：通信标准格式选择，可选I2S Philips标准、左对齐标准、右对齐标准、PCM短帧标准或PCM长帧标准，它设定SPI_I2SCFGR寄存器I2SSTD位和PCMSYNC位的值。一般设置为I2S Philips标准即可。
 
-(3) DataFormat：数据格式选择，设定有效数据长度和帧长度，可选标准16bit格式、
-    扩展16bit(32bit帧长度)格式、24bit格式和32bit格式，它设定SPI_I2SCFGR寄存器DATLEN位和CHLEN位的值。
-    对应16bit数据长度可选16bit或32bit帧长度，其他都是32bit帧长度。
+(3)	DataFormat：数据格式选择，设定有效数据长度和帧长度，可选标准16bit格式、扩展16bit(32bit帧长度)格式、24bit格式和32bit格式，它设定SPI_I2SCFGR寄存器DATLEN位和CHLEN位的值。对应16bit数据长度可选16bit或32bit帧长度，其他都是32bit帧长度。
 
-(4) MCLKOutput：主时钟输出使能控制，可选使能输出或禁止输出，它设定SPI_I2SPR寄存器MCKOE位的值。
-    为提高系统性能一般使能主时钟输出。
+(4)	MCLKOutput：主时钟输出使能控制，可选使能输出或禁止输出，它设定SPI_I2SPR寄存器MCKOE位的值。为提高系统性能一般使能主时钟输出。
 
-(5) AudioFreq：采样频率设置，HAL库提供采样采样频率选择，分别为8kHz、11kHz、16kHz、
-    22kHz、32kHz、44kHz、48kHz、96kHz、192kHz以及默认2Hz，它设定SPI_I2SPR寄存器的值。
+(5)	AudioFreq：采样频率设置，标准库提供采样采样频率选择，分别为8kHz、11kHz、16kHz、22kHz、32kHz、44kHz、48kHz、96kHz、192kHz以及默认2Hz，它设定SPI_I2SPR寄存器的值。
 
-(6) CPOL：空闲状态的CK线电平，可选高电平或低电平，它设定SPI_I2SCFGR寄存器CKPOL位的值。一般设置为电平即可。
+(6)	CPOL：空闲状态的CK线电平，可选高电平或低电平，它设定SPI_I2SCFGR寄存器CKPOL位的值。一般设置为电平即可。
+
+(7)	FirstBit：数据最先传输的位，可以是高位（MSB）先行，或者是低位（LSB）先行。
+
+(8)	WSInversion：数据的传输顺序。默认情况下，在Philips标准，当WS为低电平时，传输左声道的数据；当WS为高电平时，传输右声道的数据。而当开启此功能时，则相反。WS为低电平时，传输右声道的数据；为高电平时，传输左声道的数据。
+
+(9)	IOSwap：交换MOSI和MISO的引脚，即MOSI变为MISO，MISO变为MOSI。
+
+(10) Data24BitAlignment：当传输的数据格式为24位时，选择左对齐或者是右对齐。
+
+(11) FifoThreshold：FIFO的阈值，最大可以是16个数据。
+
+(12) MasterKeepIOState：外设失能时，是否控制GPIO口。若为1，则外设保持对IO的控制权。
+
+(13) SlaveExtendFREDetection：一般用于从机接受模式，选择在数据帧开始时检测欠载，在数据帧结束时检测欠载或者是SS信号有效。
 
 录音与回放实验
 ~~~~~~~~~~~~~~~~
@@ -464,11 +529,7 @@ WAV格式文件在现阶段一般以无损音乐格式存在，音质可以达�
 硬件设计
 ^^^^^^^^
 
-开发板板载WM8978芯片，具体电路设计参考 图36_0_12_。WM8978与STM32H743x有两个连接接口，I2S音频接口和两线I2C控制接口，
-通过将WM8978芯片的MODE引脚拉低选择两线控制接口，符合I2C通信协议，这也导致WM8978是只写的，所以在程序上需要做一些处理。
-WM8978输入部分有两种模式，一个是板载咪头输入，另外一个是通过3.5mm耳机插座引出。WM8978输出部分通过3.5mm耳机插座引出，
-可直接接普通的耳机线或作为功放设备的输入源。由于STM32H743x的I2S是半双工，所以录音跟播音我们需要用到一个模拟开关来切换，
-而控制开关(MIC_EN)则使用WM8978的GPIO1控制。
+开发板板载WM8978芯片，具体电路设计参考 图36_0_12_。WM8978与STM32H743有两个连接接口，I2S音频接口和两线I2C控制接口，通过将WM8978芯片的MODE引脚拉低选择两线控制接口，符合I2C通信协议，这也导致WM8978是只写的，所以在程序上需要做一些处理。WM8978输入部分有两种模式，一个是板载咪头输入，另外一个是通过3.5mm耳机插座引出。WM8978输出部分通过3.5mm耳机插座引出，可直接接普通的耳机线或作为功放设备的输入源。
 
 .. image:: media/image12.png
    :align: center
@@ -568,28 +629,42 @@ WM8978寄存器写入
    :name: 代码清单36_0_4
 
     /**
-    * @brief  通过I2C将给定寄存器的字节写入音频编解码器
-    * @param  RegisterAddr: 待写入寄存器的地址
-    * @param  RegisterValue: 要写入目标寄存器的字节值
-    * @retval 通信成功返回1，失败返回0
+    * @brief  写寄存器，这是提供给上层的接口
+    * @param  slave_addr: 从机地址
+    * @param  reg_addr:寄存器地址
+    * @param len：写入的长度
+    * @param data_ptr:指向要写入的数据
+    * @retval 正常为0，不正常为非0
     */
-    static uint8_t WM8978_I2C_WriteRegister(uint8_t RegisterAddr,
-    uint16_t RegisterValue)
+    int Sensors_I2C_WriteRegister(unsigned char slave_addr,
+                                unsigned char reg_addr,
+                                unsigned short len,
+                                unsigned char *data_ptr)
     {
-        uint16_t tmp;
+        HAL_StatusTypeDef status = HAL_OK;
+        status = HAL_I2C_Mem_Write(&I2C_Handle, slave_addr, reg_addr, 
+    I2C_MEMADD_SIZE_8BIT,data_ptr, len,
+                                    I2Cx_FLAG_TIMEOUT);
+        /* 检查通讯状态 */
+        if (status != HAL_OK) {
+            /* 总线出错处理 */
+            I2Cx_Error(slave_addr);
+        }
+        while (HAL_I2C_GetState(&I2C_Handle) != HAL_I2C_STATE_READY) {
+    
+        }
+        /* 检查SENSOR是否就绪进行下一次读写操作 */
+        while (HAL_I2C_IsDeviceReady(&I2C_Handle, slave_addr, I2Cx_FLAG_TIMEOUT, 
+    I2Cx_FLAG_TIMEOUT) == 
+                                    HAL_TIMEOUT);
+        /* 等待传输结束 */
+        while (HAL_I2C_GetState(&I2C_Handle) != HAL_I2C_STATE_READY) {
+    
+        }
+        return status;
+    } 
 
-        tmp  = (RegisterValue&0xff) << 8;
-        tmp |= ((RegisterAddr << 1) & 0xFE) | ((RegisterValue >> 8) & 0x1);
-        if (HAL_I2C_Master_Transmit(&I2C_Handle,WM8978_SLAVE_ADDRESS,(uint8_t
-        *)&tmp,2,WM8978_I2C_FLAG_TIMEOUT)==HAL_OK) {    return 1;
-        } else
-            return 0;
-    }
-
-WM8978_I2C_WriteRegister用于向WM8978芯片寄存器写入数值，达到配置芯片工作环境，函数有两个形参，一个是寄存器地址，可设置范围为0~57；另外一个是寄存器值，WM8978芯片寄存器总共有16bit，前7bit用于寻址，后9位才是数据，这里寄存器值形参使用uint16_t类型，只有低9位有效。
-
-使用I2C通信，首先使用中间变量提取正确的寄存器地址及数据值，然后调用HAL_I2C_Master_Transmit
-函数发送两次数据，因为I2C数据发送一次只能发送8bit数据，为此需要把RegisterValue变量的第9bit整合到RegisterAddr变量的第0位先发送，接下来再发送RegisterValue变量的低8bit数据。
+Sensors_I2C_WriteRegister用于向WM8978芯片寄存器写入数值，达到配置芯片工作环境，函数有四个形参，一个从机地址，一个是寄存器地址，可设置范围为0~57；还有寄存器值和数据长度，WM8978芯片寄存器总共有16bit，前7bit用于寻址，后9位才是数据，这里寄存器值形参使用uint16_t类型，只有低9位有效。
 
 HAL_I2C_Master_Transmit函数中还有I2C通信超时等待功能，防止出错时卡死。
 
@@ -1081,33 +1156,42 @@ I2S工作模式配置
 .. code-block:: c
    :name: 代码清单36_0_12
 
-    void I2Sx_Mode_Config(const uint16_t _usStandard,const uint16_t
-                                    _usWordLen,const uint32_t _usAudioFreq){
-
+    /**
+    * @brief  配置STM32的I2S外设工作模式
+    * @param _usStandard:接口标准，I2S_STANDARD_PHILIPS, I2S_STANDARD_MSB 或 I2S_STANDARD_LSB
+    * @param  _usWordlen : 数据格式，16bit 或者24bit
+    * @param  _usAudioFreq : 
+    采样频率，I2S_AUDIOFREQ_8K、I2S_AUDIOFREQ_16K、I2S_AUDIOFREQ_22K、
+    *         I2S_AUDIOFREQ_44K、I2S_AUDIOFREQ_48K
+    * @retval 无
+    */
+    void I2Sx_Mode_Config(const uint16_t _usStandard,const uint16_t _usWordLen,const 
+    uint32_t _usAudioFreq)
+                        
+    {
+    
         /* PLL时钟根据AudioFreq设置 (44.1khz vs 48khz groups) */
-        BSP_AUDIO_OUT_ClockConfig(&I2S_InitStructure,_usAudioFreq, NULL);
-        /* Clock config is shared between AUDIO IN and OUT   */
-
+        BSP_AUDIO_OUT_ClockConfig(&I2S_InitStructure,_usAudioFreq, NULL); /* Clock config is shared between AUDIO IN and OUT */
+                                
         /* 打开 I2S2 APB1 时钟 */
         WM8978_CLK_ENABLE();
-
+    
         /* 复位 SPI2 外设到缺省状态 */
         HAL_I2S_DeInit(&I2S_InitStructure);
-
+    
         /* I2S2 外设配置 */
         I2S_InitStructure.Instance = WM8978_I2Sx_SPI;
-        I2S_InitStructure.Init.ClockSource=RCC_I2SCLKSOURCE_PLLI2S;
         I2S_InitStructure.Init.Mode = I2S_MODE_MASTER_TX;/* 配置I2S工作模式 */
-        I2S_InitStructure.Init.Standard = _usStandard;   /* 接口标准 */
+        I2S_InitStructure.Init.Standard = _usStandard; /* 接口标准 */
         I2S_InitStructure.Init.DataFormat = _usWordLen; /* 数据格式，16bit */
-        I2S_InitStructure.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE;/* 主时钟模式 */
+        I2S_InitStructure.Init.MCLKOutput=I2S_MCLKOUTPUT_ENABLE;/* 主时钟模式 */
         I2S_InitStructure.Init.AudioFreq = _usAudioFreq; /* 音频采样频率 */
         I2S_InitStructure.Init.CPOL = I2S_CPOL_LOW;
-        HAL_I2S_Init(&I2S_InitStructure);
-
-        /* 使能 SPI2/I2S2 外设 */
-        __HAL_I2S_ENABLE(&I2S_InitStructure);
-    }
+        if (HAL_I2S_Init(&I2S_InitStructure) != HAL_OK) {
+            printf("I2S初始化失败\r\n");
+        }
+        
+    } 
 
 I2Sx_Mode_Config函数用于配置STM32控制器的I2S接口工作模式，它有三个形参，第一个为指定I2S接口标准，一般设置为I2S
 Philips标准，第二个为字长设置，一般设置为16bit，第三个为采样频率，一般设置为44KHz既可得到高音质效果。
@@ -1222,8 +1306,22 @@ I2Sx_TX_DMA_STREAM_IRQFUN函数是I2S的DMA传输中断服务函数，在判断�
     */
     void I2S_Play_Start(void)
     {
-        //开启DMA TX发送请求,开始播放
-        I2S_InitStructure.Instance->CR2 |= SPI_CR2_TXDMAEN;
+        if (HAL_IS_BIT_CLR(I2S_InitStructure.Instance->CFG1, SPI_CFG1_TXDMAEN)) {
+            if ((I2S_InitStructure.Instance->CR1 & SPI_CR1_SPE) == SPI_CR1_SPE) {
+                /*开启DMA请求*/
+                SET_BIT(I2S_InitStructure.Instance->CFG1, SPI_CFG1_TXDMAEN);
+            } else {
+                __HAL_I2S_DISABLE(&I2S_InitStructure);
+
+                /*开启DMA请求*/
+                SET_BIT(I2S_InitStructure.Instance->CFG1, SPI_CFG1_TXDMAEN);
+
+                /* 使能I2S */
+                __HAL_I2S_ENABLE(&I2S_InitStructure);
+            }
+        }
+        /* 开始传输 */
+        SET_BIT(I2S_InitStructure.Instance->CR1, SPI_CR1_CSTART);
     }
 
     /**
@@ -1237,7 +1335,7 @@ I2Sx_TX_DMA_STREAM_IRQFUN函数是I2S的DMA传输中断服务函数，在判断�
         HAL_I2S_DMAStop(&I2S_InitStructure);
     }
 
-I2S_Play_Start用于开始播放，I2S_Play_Stop用于停止播放，实际是通过控制DMA传输使能来实现。
+I2S_Play_Start用于开始播放，I2S_Play_Stop用于停止播放，实际是通过控制DMA传输使能来实现。值得注意的是，I2S_Play_Start中需要将寄存器CR1的位CSTART置一，来启动传输。
 
 I2S录音功能模式配置
 ====================
@@ -1248,45 +1346,41 @@ I2S录音功能模式配置
    :name: 代码清单36_0_16
 
     /**
-    *@brief  配置STM32的I2S外设工作模式
-    *@param_usStandard:接口标准，I2S_Standard_Phillips,I2S_Standard_MSB或I2S_Standard_LSB
-    *@param  _usWordlen : 数据格式，16bit 或者24bit
-    *@param  _usAudioFreq : 采样频率，I2S_AudioFreq_8K、I2S_AudioFreq_16K、I2S_AudioFreq_22K、
-    *         I2S_AudioFreq_44K、I2S_AudioFreq_48
+    * @brief  配置STM32的I2S外设工作模式
+    * @param  _usStandard : 接口标准，I2S_Standard_Phillips, I2S_Standard_MSB 或  I2S_Standard_LSB
+    * @param  _usWordlen : 数据格式，16bit 或者24bit
+    * @param  _usAudioFreq :  采样频率，I2S_AudioFreq_8K、I2S_AudioFreq_16K、I2S_AudioFreq_22K、
+    *       I2S_AudioFreq_44K、I2S_AudioFreq_48
     * @retval 无
     */
-    void I2Sxext_Mode_Config(uint16_t _usStandard, uint16_t _usWordLen, uint32_t _usAudioFreq)
+    void I2Sxext_Mode_Config(const uint16_t _usStandard, const uint16_t 
+    _usWordLen,const uint32_t _usAudioFreq)
+                            
     {
+        /* PLL时钟根据AudioFreq设置 (44.1khz vs 48khz groups) */
+        BSP_AUDIO_OUT_ClockConfig(&I2Sext_InitStructure,_usAudioFreq, NULL); 
+                                
 
-        BSP_AUDIO_OUT_ClockConfig(&I2Sext_InitStructure,_usAudioFreq, NULL);
+        /* 打开 I2S2 APB1 时钟 */
+        WM8978_CLK_ENABLE();
 
         /* 复位 SPI2 外设到缺省状态 */
         HAL_I2S_DeInit(&I2Sext_InitStructure);
 
         /* I2S2 外设配置 */
-        I2Sext_InitStructure.Instance = WM8978_I2Sx_ext;
-        I2Sext_InitStructure.Init.ClockSource=RCC_I2SCLKSOURCE_PLLI2S;
-        I2Sext_InitStructure.Init.FullDuplexMode = I2S_FULLDUPLEXMODE_ENABLE;
-        I2Sext_InitStructure.Init.Mode = I2S_MODE_SLAVE_RX;//配置I2S工作模式
-        I2Sext_InitStructure.Init.Standard = _usStandard;     /* 接口标准 */
-        I2Sext_InitStructure.Init.DataFormat = _usWordLen;//数据格式，16bit
-        I2Sext_InitStructure.Init.MCLKOutput=I2S_MCLKOUTPUT_ENABLE;//主时钟模式
-        I2Sext_InitStructure.Init.AudioFreq = _usAudioFreq; /* 音频采样频率 */
+        I2Sext_InitStructure.Instance = WM8978_I2Sx_SPI;
+        I2Sext_InitStructure.Init.Mode = I2S_MODE_MASTER_RX;      /* 配置I2S工作模式 */
+        I2Sext_InitStructure.Init.Standard = _usStandard;       /* 接口标准 */
+        I2Sext_InitStructure.Init.DataFormat = _usWordLen;        /* 数据格式，16bit */
+        I2Sext_InitStructure.Init.MCLKOutput = I2S_MCLKOUTPUT_ENABLE; /* 主时钟模式 */
+        I2Sext_InitStructure.Init.AudioFreq = _usAudioFreq;     /* 音频采样频率 */
         I2Sext_InitStructure.Init.CPOL = I2S_CPOL_LOW;
-    //  HAL_I2S_Init(&I2S_InitStructure);
-
         if (HAL_I2S_Init(&I2Sext_InitStructure) != HAL_OK) {
             printf("I2S初始化失败\r\n");
         }
-        /* 使能 SPI2/I2S2 外设 */
-        __HAL_I2S_ENABLE(&I2Sext_InitStructure);
+    } 
 
-        /* Enable I2S peripheral after the I2S */
-        __HAL_I2S_ENABLE(&I2S_InitStructure);
-    }
-
-I2Sx_Mode_Config函数与I2Sx_Mode_Config函数类似，只不过一个用于输入即录音一个用于输出即放音。这里用于配置STM32控制器的I2S接口工作模式为录音，它有三个形参，第一个为指定I2S接口标准，一般设置为I2S
-Philips标准，第二个为字长设置，一般设置为16bit，第三个为采样频率，一般设置为44KHz既可得到高音质效果。
+I2Sx_Mode_Config函数与I2Sx_Mode_Config函数类似，只不过一个用于输入即录音一个用于输出即放音。这里用于配置STM32控制器的I2S接口工作模式为录音，它有三个形参，第一个为指定I2S接口标准，一般设置为I2S Philips标准，第二个为字长设置，一般设置为16bit，第三个为采样频率，一般设置为44KHz既可得到高音质效果。
 
 首先是时钟配置，使用BSP_AUDIO_OUT_ClockConfig函数选择I2S时钟源，一般选择内部PLLI2S时钟，使能PLLI2S时钟，并等待时钟正常后使用WM8978_CLK_ENABLE函数开启I2S外设时钟。
 
@@ -1297,7 +1391,7 @@ Philips标准，第二个为字长设置，一般设置为16bit，第三个为�
 I2S扩展数据接收(DMA传输)
 ===========================
 
-代码清单36_0_17 I2Sxext_RX_DMA_Init函数
+代码清单36_0_17 I2Sxext_RX_DMA_Init函数（文件bsp_wm8978.c）
 
 .. code-block:: c
    :name: 代码清单36_0_17
@@ -1309,40 +1403,35 @@ I2S扩展数据接收(DMA传输)
     * @param  num:每次传输数据量
     * @retval 无
     */
-    void I2Sxext_RX_DMA_Init(const uint16_t *buffer0,const uint16_t *buffer1,const uint32_t num){
-        DMA_HandleTypeDef  DMA_RXInitStructure;
-
+    void I2Sxext_RX_DMA_Init(uint32_t buffer0,uint32_t buffer1,const uint32_t num)
+    {
+        DMA_HandleTypeDef  DMA_InitStructure;
         I2Sx_DMA_CLK_ENABLE();//DMA1时钟使能
 
+        //清空DMA1_Stream4上所有中断标志
+        __HAL_DMA_CLEAR_FLAG(&DMA_InitStructure,DMA_FLAG_FEIF0_4 | DMA_FLAG_DMEIF0_4 |\
+                            DMA_FLAG_TEIF0_4 | DMA_FLAG_HTIF0_4 | DMA_FLAG_TCIF0_4);
         /* 配置 DMA Stream */
-        hdma_spi2_rx.Instance =I2Sxext_RX_DMA_STREAM;
-        hdma_spi2_rx.Init.Channel = I2Sxext_RX_DMA_CHANNEL;  //通道3 SPIx_RX通道
+        hdma_spi2_rx.Instance =I2Sx_RX_DMA_STREAM;
+        hdma_spi2_rx.Init.Request = DMA_REQUEST_SPI2_RX;
         hdma_spi2_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;//存储器到外设模式
         hdma_spi2_rx.Init.PeriphInc = DMA_PINC_DISABLE;//外设非增量模式
         hdma_spi2_rx.Init.MemInc = DMA_MINC_ENABLE;//存储器增量模式
-        hdma_spi2_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;//外设数据长度:16位
-        hdma_spi2_rx.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;//存储器数据长度：16位
+        hdma_spi2_rx.Init.PeriphDataAlignment=DMA_PDATAALIGN_HALFWORD;//外设数据长度:16位
+        hdma_spi2_rx.Init.MemDataAlignment= DMA_MDATAALIGN_HALFWORD;//存储器数据长度：16位
         hdma_spi2_rx.Init.Mode = DMA_CIRCULAR;// 使用循环模式
-        hdma_spi2_rx.Init.Priority = DMA_PRIORITY_LOW;//高优先级
+        hdma_spi2_rx.Init.Priority = DMA_PRIORITY_VERY_HIGH;//高优先级
         hdma_spi2_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE; //不使用FIFO模式
-        hdma_spi2_rx.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
-        hdma_spi2_rx.Init.MemBurst = DMA_MBURST_SINGLE;//外设突发单次传输
-        hdma_spi2_rx.Init.PeriphBurst = DMA_PBURST_SINGLE;//存储器突发单次传输
-        __HAL_DMA_CLEAR_FLAG(&DMA_RXInitStructure,DMA_FLAG_FEIF3_7 | DMA_FLAG_DMEIF3_7 | DMA_FLAG_TEIF3_7 |
-        DMA_FLAG_HTIF3_7  | DMA_FLAG_TCIF3_7);
         HAL_DMA_Init(&hdma_spi2_rx);//初始化DMA Stream
 
-        HAL_DMAEx_MultiBufferStart_IT(&hdma_spi2_rx,(uint32_t)&(WM8978_I2Sx_SPI->DR),(uint32_t)buffer0,(uint32_t)buffer1,num);
+        HAL_DMAEx_MultiBufferStart_IT(&hdma_spi2_rx,(uint32_t)&(WM8978_I2Sx_SPI->RXDR),(uint32_t)buffer0, (uint32_t)buffer1,num);
 
         __HAL_LINKDMA(&I2Sext_InitStructure,hdmarx,hdma_spi2_rx);
-
         /* NVIC configuration for I2S interrupts */
-        HAL_NVIC_SetPriority(SPI2_IRQn, 0, 3);
-        HAL_NVIC_EnableIRQ(SPI2_IRQn);
 
-        HAL_NVIC_SetPriority(I2Sxext_RX_DMA_STREAM_IRQn,0,0);
-        HAL_NVIC_EnableIRQ(I2Sxext_RX_DMA_STREAM_IRQn);
-    }
+        HAL_NVIC_SetPriority(I2Sx_RX_DMA_STREAM_IRQn,0,5);
+        HAL_NVIC_EnableIRQ(I2Sx_RX_DMA_STREAM_IRQn);
+    } 
 
 I2Sxext_RX_DMA_Init函数配置I2S的数据接收功能，使用DMA传输方式接收数据，程序结构与I2Sx_TX_DMA_Init函数一致，只是DMA传输方向不同，I2Sxext_RX_DMA_Init函数是从外设到存储器传输，I2Sx_TX_DMA_Init函数是存储器到外设传输。
 
@@ -1386,10 +1475,25 @@ DMA数据接收传输完成中断服务函数
     */
     void I2Sxext_Recorde_Start(void)
     {
-        //开启DMA RX传输,开始录音
-        I2Sext_InitStructure.Instance->CR2 |= SPI_CR2_RXDMAEN;
+        /* Check if the I2S Tx request is already enabled */
+        if (HAL_IS_BIT_CLR(I2Sext_InitStructure.Instance->CFG1, SPI_CFG1_RXDMAEN)) {
+            /* Check if the SPI2S is disabled to edit CFG1 register */
+            if ((I2Sext_InitStructure.Instance->CR1 & SPI_CR1_SPE) == SPI_CR1_SPE) {
+                /* Enable Tx DMA Request */
+                SET_BIT(I2Sext_InitStructure.Instance->CFG1, SPI_CFG1_RXDMAEN);
+            } else {
+                /* Disable SPI peripheral */
+                __HAL_I2S_DISABLE(&I2Sext_InitStructure);
+    
+                /* Enable Tx DMA Request */
+                SET_BIT(I2Sext_InitStructure.Instance->CFG1, SPI_CFG1_RXDMAEN);
+                /* Enable SPI peripheral */
+                __HAL_I2S_ENABLE(&I2Sext_InitStructure);
+            }
+            /* Master transfer start */
+            SET_BIT(I2Sext_InitStructure.Instance->CR1, SPI_CR1_CSTART);
+        }
     }
-
     /**
     * @brief  关闭I2S录音
     * @param  无
@@ -1398,7 +1502,7 @@ DMA数据接收传输完成中断服务函数
     void I2Sxext_Recorde_Stop(void)
     {
         HAL_I2S_DMAStop(&I2Sext_InitStructure);
-    }
+    } 
 
 I2Sxext_Recorde_Start函数用于启动录音，I2Sxext_Recorde_Stop函数用于停止录音，实际是通过控制DMA传输使能来实现。
 
@@ -1580,7 +1684,7 @@ StartRecord函数在结构上与StartPlay函数类似，它实现启动录音功
 
 开发板支持LINE线输入和板载咪头输入，程序默认使用咪头输入，在录音同时使能耳机输出，这样录音时在耳机接口是有相同的声音输出的。
 
-录音功能需要使能扩展I2S。
+录音功能需要使能模拟开关切换I2S输入通道。
 
 录音和回放功能选择
 ==========================
@@ -1807,32 +1911,31 @@ DMA传输完成中断回调函数
 
     int main(void)
     {
-        /* 配置系统时钟为216 MHz */
+        FRESULT result;
+        /* 系统时钟初始化成400MHz */
         SystemClock_Config();
-        /* 使能指令缓存 */
-        SCB_EnableICache();
-        /*禁用WiFi模块*/
-        WIFI_PDN_INIT();
-        /* 初始化LED */
-        LED_GPIO_Config();
-        LED_BLUE;
-        /* 初始化触摸按键 */
-        TPAD_Init();
+
+        CPU_CACHE_Enable();
+        HAL_NVIC_SetPriorityGrouping(NVIC_PRIORITYGROUP_0);
+        /* 初始化按键 */
+        Key_GPIO_Config();
+
         /* 初始化调试串口，一般为串口1 */
-        UARTx_Config();
-        printf("WM8978录音和回放功能\n");
+        DEBUG_USART_Config();
+
         //链接驱动器，创建盘符
         FATFS_LinkDriver(&SD_Driver, SDPath);
         //在外部SD卡挂载文件系统，文件系统挂载时会对SD卡初始化
-        res_sd = f_mount(&fs,"0:",1);
-
-        if (res_sd!=FR_OK) {
-            printf("！！SD卡挂载文件系统失败。(%d)\r\n",res_sd);
-            printf("！！可能原因：SD卡初始化不成功。\r\n");
+        result = f_mount(&fs,"0:",1);
+        if (result!=FR_OK) {
+            printf("\n SD卡文件系统挂载失败\n");
             while (1);
-        } else {
-            printf("SD卡挂载成功\r\n");
         }
+        printf("WM8978录音和回放功能\n");
+
+        /*  初始化电容按键  */
+        TPAD_Init();
+
         /* 检测WM8978芯片，此函数会自动配置CPU的GPIO */
         if (wm8978_Init()==0) {
             printf("检测不到WM8978芯片!!!\n");
@@ -1842,11 +1945,7 @@ DMA传输完成中断回调函数
 
         /* 录音与回放功能 */
         RecorderDemo();
-
-        while (1) {
-        }
-    }
-
+    } 
 
 main函数主要完成各个外设的初始化，包括独立按键初始化、电容按键初始化、调试串口初始化、SD卡文件系统挂载还有系统定时器初始化。
 
@@ -2391,19 +2490,18 @@ DMA发送完成中断回调函数
 
     int main(void)
     {
-        /* 配置系统时钟为216 MHz */
+        /* 系统时钟初始化成400MHz */
         SystemClock_Config();
-        /* 使能指令缓存 */
-        SCB_EnableICache();
-        /*禁用WiFi模块*/
-        WIFI_PDN_INIT();
+
+        CPU_CACHE_Enable();
+
         /* 初始化LED */
         LED_GPIO_Config();
         LED_BLUE;
         /* 初始化触摸按键 */
         TPAD_Init();
         /* 初始化调试串口，一般为串口1 */
-        UARTx_Config();
+        DEBUG_USART_Config();
 
         printf("Music Player\n");
         //链接驱动器，创建盘符
@@ -2425,11 +2523,12 @@ DMA发送完成中断回调函数
         }
         printf("初始化WM8978成功\n");
 
+
         while (1) {
             mp3PlayerDemo("0:/mp3/张国荣-玻璃之情.mp3");
             mp3PlayerDemo("0:/mp3/张国荣-全赖有你.mp3");
         }
-    }
+    } 
 
 main函数主要完成各个外设的初始化，包括初始化禁用WIFI模块、调试串口初始化、SD卡文件系统挂载还有系统滴答定时器初始化。
 

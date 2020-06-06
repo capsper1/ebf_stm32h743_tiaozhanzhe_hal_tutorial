@@ -89,8 +89,7 @@ ADC的时钟来源
 规则序列
 ===========
 
-规则序列寄存器有3个，分别为SQR3、SQR2、SQR1。SQR3控制着规则序列中的第一个到第六个转换，对应的位为：SQ1[4:0]~SQ6[4:0]，第一次转换的是位4:0
-SQ1[4:0]，如果通道16想第一次转换，那么在SQ1[4:0]写16即可。SQR2控制着规则序列中的第7到第12个转换，对应的位为：SQ7[4:0]~SQ12[4:0]，如果通道1想第8个转换，则SQ8[4:0]写1即可。SQR1控制着规则序列中的第13到第16个转换，对应位为：SQ13[4:0]~SQ16[4:0]，如果通道6想第10个转换，则SQ10[4:0]写6即可。具体使用多少个通道，由SQR1的位L[3:0]决定，最多16个通道。
+规则序列寄存器有4个，分别为SQR1、SQR2、SQR3、SQR4。SQR1控制着规则序列中的第一个到第六个转换，对应的位为：SQ1[4:0]~SQ4[4:0]，第一次转换的是位4:0 SQ1[4:0]，如果通道16想第一次转换，那么在SQ1[4:0]写16即可。SQR2控制着规则序列中的第5到第9个转换，对应的位为：SQ5[4:0]~SQ9[4:0]，如果通道1想第8个转换，则SQ8[4:0]写1即可。SQR4控制着规则序列中的第10到第14个转换，对应位为：SQ10[4:0]~SQ14[4:0]，如果通道6想第10个转换，则SQ10[4:0]写6即可。具体使用多少个通道，由SQR1的位L[3:0]决定，最多16个通道。
 
 .. image:: media/image3.png
    :align: center
@@ -102,10 +101,7 @@ SQ1[4:0]，如果通道16想第一次转换，那么在SQ1[4:0]写16即可。SQR
 注入序列
 ===========
 
-注入序列寄存器JSQR只有一个，最多支持4个通道，具体多少个由JSQR的JL[2:0]决定。如果JL的
-值小于4的话，则JSQR跟SQR决定转换顺序的设置不一样，第一次转换的不是JSQR1[4:0]，而是JCQRx[4:0]
-，x =
-（4-JL），跟SQR刚好相反。如果JL=00（1个转换），那么转换的顺序是从JSQR4[4:0]开始，而不是从JSQR1[4:0]开始，这个要注意，编程的时候不要搞错。当JL等于4时，跟SQR一样。
+注入序列寄存器JSQR只有一个，最多支持4个通道，具体多少个由JSQR的JL[2:0]决定。转换顺序与规则序列寄存器SQR一样。
 
 .. image:: media/image4.png
    :align: center
@@ -120,9 +116,9 @@ SQ1[4:0]，如果通道16想第一次转换，那么在SQ1[4:0]写16即可。SQR
 通道选好了，转换的顺序也设置好了，那接下来就该开始转换了。ADC转换可以由ADC控制寄存器2: ADC_CR2的ADON这个位来控制，
 写1的时候开始转换，写0的时候停止转换，这个是最简单也是最好理解的开启ADC转换的控制方式，理解起来没啥技术含量。
 
-除了这种庶民式的控制方法，ADC还支持外部事件触发转换，这个触发包括内部定时器触发和外部IO触发。触发源有很多，具体选择哪一种触发源，由ADC控制寄存器2:ADC_CR2的EXTSEL[2:0]和JEXTSEL[2:0]位来控制。EXTSEL[2:0]用于选择规则通道的触发源，JEXTSEL[2:0]用于选择注入通道的触发源。选定好触发源之后，触发源是否要激活，则由ADC控制寄存器2:ADC_CR2的EXTTRIG和JEXTTRIG这两位来激活。
+除了这种庶民式的控制方法，ADC还支持外部事件触发转换，这个触发包括内部定时器触发和外部IO触发。触发源有很多，具体选择哪一种触发源，由ADC控制寄存器:ADC_CR的EXTSEL[4:0]和ADC_JSQR的JEXTSEL[4:0]位来控制。EXTSEL[2:0]用于选择规则通道的触发源，JEXTSEL[4:0]用于选择注入通道的触发源。
 
-如果使能了外部触发事件，我们还可以通过设置ADC控制寄存器2:ADC_CR2的EXTEN[1:0]和JEXTEN[1:0]来控制触发极性，可以有4种状态，分别是：禁止触发检测、上升沿检测、下降沿检测以及上升沿和下降沿均检测。
+如果使能了外部触发事件，我们还可以通过设置ADC控制寄存器:ADC_CR的EXTEN[1:0]和ADC_JSQR的JEXTEN[1:0]来控制触发极性，可以有4种状态，分别是：禁止触发检测、上升沿检测、下降沿检测以及上升沿和下降沿均检测。
 
 转换时间
 '''''''''
@@ -145,7 +141,7 @@ Tconv = 采样时间 + 7.5个周期
 '''''''''''
 
 一切准备就绪后，ADC转换后的数据根据转换组的不同，规则组的数据放在ADC_DR寄存器，注入组的数据放在JDRx。
-如果是使用双重或者三重模式那规矩组的数据是存放在通用规矩寄存器ADC_CDR内的。
+如果是使用双重或者双重模式那规矩组的数据是存放在通用规矩寄存器ADC_CDR内的。
 
 规则数据寄存器ADC_DR
 ======================
@@ -164,7 +160,7 @@ ADC注入组最多有4个通道，刚好注入数据寄存器也有4个，每个
 通用规则数据寄存器ADC_CDR
 =========================
 
-规则数据寄存器ADC_DR是仅适用于独立模式的，而通用规则数据寄存器ADC_CDR是适用于双重和三重模式的。独立模式就是仅仅适用三个ADC的其中一个，双重模式就是同时使用ADC1和ADC2，而三重模式就是三个ADC同时使用。在双重或者三重模式下一般需要配合DMA数据传输使用。
+规则数据寄存器ADC_DR是仅适用于独立模式的，而通用规则数据寄存器ADC_CDR是适用于双重和双重模式的。独立模式就是仅仅适用三个ADC的其中一个，双重模式就是同时使用ADC1和ADC2，而双重模式就是三个ADC同时使用。在双重或者双重模式下一般需要配合DMA数据传输使用。
 
 中断
 '''''
@@ -878,24 +874,29 @@ ADC_ChannelConfTypeDef函数用来绑定ADC通道转换顺序和采样时间。�
 
    int main(void)
    {
-      /* 配置系统时钟为216 MHz */
+
+      /* 系统时钟初始化成400MHz */
       SystemClock_Config();
 
-      /* 初始化USART1 配置模式为 115200 8-N-1 */
-      UARTx_Config();
+      /* 配置串口1为：115200 8-N-1 */
+      DEBUG_USART_Config();
 
-      Rheostat_Init();
+      /* ADC初始化子程序 */
+      ADC_Init();
+
       while (1) {
-      ADC_ConvertedValueLocal[0] =(float) ADC_ConvertedValue[0]/4096*(float)3.3;
-      ADC_ConvertedValueLocal[1] =(float) ADC_ConvertedValue[1]/4096*(float)3.3;
-      ADC_ConvertedValueLocal[2] =(float) ADC_ConvertedValue[2]/4096*(float)3.3;
+         ADC_vol[0] =(float) ADC_ConvertedValue[0]/65536*(float)3.3;
+         ADC_vol[1] =(float) ADC_ConvertedValue[1]/65536*(float)3.3;
+         ADC_vol[2] =(float) ADC_ConvertedValue[2]/65536*(float)3.3;
+         ADC_vol[3] =(float) ADC_ConvertedValue[3]/65536*(float)3.3;
 
-      printf("\r\n CH1_PC3 value = %f V \r\n",ADC_ConvertedValueLocal[0]);
-      printf("\r\n CH2_PA4 value = %f V \r\n",ADC_ConvertedValueLocal[1]);
-      printf("\r\n CH3_PA6 value = %f V \r\n",ADC_ConvertedValueLocal[2]);
+         printf("\r\n CH1_PA4 value = %f V \r\n",ADC_vol[0]);
+         printf("\r\n CH2_PA5 value = %f V \r\n",ADC_vol[1]);
+         printf("\r\n CH3_PA6 value = %f V \r\n",ADC_vol[2]);
+         printf("\r\n CH3_PA7 value = %f V \r\n",ADC_vol[3]);
 
-      printf("\r\n\r\n");
-      Delay(0xffffff);
+         printf("\r\n\r\n");
+         Delay(0xffffff);
       }
    }
 
@@ -915,29 +916,26 @@ Delay函数只是一个简单的延时函数。
 
 将待测电压通过杜邦线接在对应引脚上，用USB线连接开发板的“USB转串口”接口跟电脑，在电脑端打开串口调试助手，把编译好的程序下载到开发板。在串口调试助手可看到不断有数据从开发板传输过来，此时我们改变输入电压值，那么对应的数据也会有变化。
 
-三重ADC交替模式采集实验
+双重ADC交替模式采集实验
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-AD转换包括采样阶段和转换阶段，在采样阶段才对通道数据进行采集；而在转换阶段只是将采集到的数据进行转换为数字量输出，此刻通道数据变化不会改变转换结果。独立模式的ADC采集需要在一个通道采集并且转换完成后才会进行下一个通道的采集。双重或者三重ADC的机制使用两个或以上ADC同时采样两个或以上不同通道的数据或者使用两个或以上ADC交叉采集同一通道的数据。双重或者三重ADC模式较独立模式一个最大的优势就是转换速度快。
+AD转换包括采样阶段和转换阶段，在采样阶段才对通道数据进行采集；而在转换阶段只是将采集到的数据进行转换为数字量输出，此刻通道数据变化不会改变转换结果。独立模式的ADC采集需要在一个通道采集并且转换完成后才会进行下一个通道的采集。双重的机制使用两个或以上ADC同时采样两个或以上不同通道的数据或者使用两个或以上ADC交叉采集同一通道的数据。双重或者三重ADC模式较独立模式一个最大的优势就是转换速度快。
 
-我们这里只介绍三重ADC交替模式，关于双重或者三重ADC的其他模式与之类似，可以参考三重ADC交替模式使用。
-三重ADC交替模式是针对同一通道的使用三个ADC交叉采集，就是在ADC1采样完等几个时钟周期后ADC2开始采样，
-此时ADC1处在转换阶段，当ADC2采样完成再等几个时钟周期后ADC3就进行采样此时ADC1和ADC2处在转换阶段，
-如果ADC3采样完成并且ADC1已经转换完成那么就可以准备下一轮的循环，这样充分利用转换阶段时间达到增快采样速度的效果。
-AD转换过程见 图29_6_，利用ADC的转换阶段时间另外一个ADC进行采样，
-而不用像独立模式必须等待采样和转换结束后才进行下一次采样及转换。
+我们这里介绍双重ADC交替模式，只适用于ADC1和ADC2。双重ADC交替模式是针对同一通道的使用两个ADC（ADC1作为主ADC，ADC2作为从ADC）交叉采集，就是在ADC1采样完等几个时钟周期后ADC2开始采样，
+此时ADC1处在转换阶段，当ADC2采样完成再等几个时钟周期后ADC1就进行采样，充分利用转换阶段时间达到增快采样速度的效果。
+AD转换过程见 图29_6_，利用ADC的转换阶段时间另外一个ADC进行采样，而不用像独立模式必须等待采样和转换结束后才进行下一次采样及转换。
 
 .. image:: media/image6.png
    :align: center
-   :alt: 图 29‑6 三重ADC交叉模式
+   :alt: 图 29‑6 双重ADC交叉模式
    :name: 图29_6
 
-图 29‑6 三重ADC交叉模式
+图 29‑6 双重ADC交叉模式
 
 硬件设计
 '''''''''''''
 
-三重ADC交叉模式是针对同一个通道的ADC采集模式，这种情况跟前面小节的单通道实验非常类似，
+双重ADC交叉模式是针对同一个通道的ADC采集模式，这种情况跟前面小节的单通道实验非常类似，
 只是同时使用三个ADC对同一通道进行采集，所以电路设计与之相同即可，具体可参考 图29_5_。
 
 软件设计
@@ -957,7 +955,7 @@ AD转换过程见 图29_6_，利用ADC的转换阶段时间另外一个ADC进行
 
 3) 配置DMA控制将ADC通用规矩数据寄存器数据转存到指定存储区；
 
-4) 配置通用ADC为三重ADC交替模式，采样4分频，使用DMA模式2；
+4) 配置通用ADC为双重ADC交替模式，采样4分频，使用DMA模式2；
 
 5) 设置ADC1、ADC2和ADC3为12位分辨率，禁用扫描，连续转换，不需要外部触发；
 
@@ -982,32 +980,29 @@ ADC宏定义
 .. code-block:: c
    :name: 代码清单29_11
 
-   #define RHEOSTAT_NOFCHANEL      3
+   //引脚定义
+   #define RHEOSTAT_ADC_PIN                            GPIO_PIN_4
+   #define RHEOSTAT_ADC_GPIO_PORT                      GPIOA
+   #define RHEOSTAT_ADC_GPIO_CLK_ENABLE()              __GPIOA_CLK_ENABLE()
+   
+   // ADC_MASTER序号宏定义
+   #define RHEOSTAT_ADC_MASTER                         ADC1
+   #define RHEOSTAT_ADC_MASTER_CLK_ENABLE()            __ADC1_CLK_ENABLE()
+   #define RHEOSTAT_ADC_MASTER_CHANNEL                 ADC_CHANNEL_18
+   
+   // ADC_SLAVE序号宏定义
+   #define RHEOSTAT_ADC_SLAVE                          ADC2
+   #define RHEOSTAT_ADC_SLAVE_CLK_ENABLE()             __ADC2_CLK_ENABLE()
+   #define RHEOSTAT_ADC_SLAVE_CHANNEL                  ADC_CHANNEL_18
+   
+   //DMA时钟使能
+   #define RHEOSTAT_ADC_DMA_CLK_ENABLE()               __HAL_RCC_DMA1_CLK_ENABLE();
+   #define RHEOSTAT_ADC_DMA_Base                       DMA1_Stream1
+   #define RHEOSTAT_ADC_DMA_Request                    DMA_REQUEST_ADC1
+   //DMA中断服务函数
+   #define RHEOSTAT_ADC_DMA_IRQHandler         DMA1_Stream1_IRQHandler
 
-   // PC3 通过调帽接电位器
-   // ADC IO宏定义
-   #define RHEOSTAT_ADC_GPIO_PORT             GPIOC
-   #define RHEOSTAT_ADC_GPIO_PIN              GPIO_PIN_3
-   #define RHEOSTAT_ADC_GPIO_CLK_ENABLE()     __GPIOC_CLK_ENABLE()
-
-   // ADC 序号宏定义
-   #define RHEOSTAT_ADC1                      ADC1
-   #define RHEOSTAT_ADC2                      ADC2
-   #define RHEOSTAT_ADC3                      ADC3
-   #define RHEOSTAT_ADC1_CLK_ENABLE()         __ADC1_CLK_ENABLE()
-   #define RHEOSTAT_ADC2_CLK_ENABLE()         __ADC2_CLK_ENABLE()
-   #define RHEOSTAT_ADC3_CLK_ENABLE()         __ADC3_CLK_ENABLE()
-   #define RHEOSTAT_ADC_CHANNEL               ADC_CHANNEL_13
-
-   // ADC DR寄存器宏定义，ADC转换后的数字值则存放在这里
-   #define RHEOSTAT_ADC_DR_ADDR               ((uint32_t)0x40012308)
-
-   // ADC DMA 通道宏定义，这里我们使用DMA传输
-   #define RHEOSTAT_ADC_DMA_CLK_ENABLE()       __DMA2_CLK_ENABLE()
-   #define RHEOSTAT_ADC_DMA_CHANNEL            DMA_CHANNEL_0
-   #define RHEOSTAT_ADC_DMA_STREAM             DMA2_Stream0
-
-双重或者三重ADC需要使用通用规则数据寄存器ADC_CDR，这点跟独立模式不同。定义电位器动触点引脚作为三重ADC的模拟输入。
+双重ADC需要使用通用规则数据寄存器ADC_CDR，这点跟独立模式不同。定义光敏电阻的引脚作为三重ADC的模拟输入。
 
 ADC GPIO初始化函数
 ..............................
@@ -1017,204 +1012,166 @@ ADC GPIO初始化函数
 .. code-block:: c
    :name: 代码清单29_12
 
-   static void Rheostat_ADC_GPIO_Config(void)
+   static void ADC_GPIO_Mode_Config(void)
    {
-      GPIO_InitTypeDef GPIO_InitStructure;
-      // 使能 GPIO 时钟
+      /* 定义一个GPIO_InitTypeDef类型的结构体 */
+      GPIO_InitTypeDef  GPIO_InitStruct;
+      /* 使能ADC引脚的时钟 */
       RHEOSTAT_ADC_GPIO_CLK_ENABLE();
-      // 配置 IO
-      GPIO_InitStructure.Pin = RHEOSTAT_ADC_GPIO_PIN;
-      GPIO_InitStructure.Mode = GPIO_MODE_ANALOG;
-      GPIO_InitStructure.Pull = GPIO_NOPULL ; //不上拉不下拉
-      HAL_GPIO_Init(RHEOSTAT_ADC_GPIO_PORT, &GPIO_InitStructure);
+   
+      GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+      GPIO_InitStruct.Pull = GPIO_NOPULL;
+      GPIO_InitStruct.Pin = RHEOSTAT_ADC_PIN;
+      /* 配置为模拟输入，不需要上拉电阻 */
+      HAL_GPIO_Init(RHEOSTAT_ADC_GPIO_PORT, &GPIO_InitStruct);
+   
    }
 
 使用到GPIO时候都必须开启对应的GPIO时钟，GPIO用于AD转换功能必须配置为模拟输入模式。
 
-配置三重ADC交替模式
+配置双重ADC交替模式
 ..............................
 
-代码清单 29‑13 三重ADC交替模式配置
+代码清单 29‑13 双重ADC交替模式配置
 
 .. code-block:: c
    :name: 代码清单29_13
 
-   static void Rheostat_ADC_Mode_Config(void)
+   static void ADC_Mode_Config(void)
    {
-      ADC_MultiModeTypeDef   mode;
-      // ------------------DMA Init 结构体参数 初始化-------------------------
-      // ADC1使用DMA2，数据流0，通道0，这个是手册固定死的
-      // 开启DMA时钟
+      ADC_ChannelConfTypeDef ADC_Config;
+   
+      RCC_PeriphCLKInitTypeDef RCC_PeriphClkInit;
+      /*            配置ADC3时钟源             */
+      /*    HSE Frequency(Hz)    = 25000000   */
+      /*         PLL_M                = 5     */
+      /*         PLL_N                = 160   */
+      /*         PLL_P                = 25    */
+      /*         PLL_Q                = 2     */
+      /*         PLL_R                = 2     */
+      /*     ADC_ker_clk         = 32000000   */
+      RCC_PeriphClkInit.PeriphClockSelection = RCC_PERIPHCLK_ADC;
+      RCC_PeriphClkInit.PLL2.PLL2FRACN = 0;
+      RCC_PeriphClkInit.PLL2.PLL2M = 5;
+      RCC_PeriphClkInit.PLL2.PLL2N = 160;
+      RCC_PeriphClkInit.PLL2.PLL2P = 25;
+      RCC_PeriphClkInit.PLL2.PLL2Q = 2;
+      RCC_PeriphClkInit.PLL2.PLL2R = 2;
+      RCC_PeriphClkInit.PLL2.PLL2RGE = RCC_PLL2VCIRANGE_2;
+      RCC_PeriphClkInit.PLL2.PLL2VCOSEL = RCC_PLL2VCOWIDE;
+      RCC_PeriphClkInit.AdcClockSelection = RCC_ADCCLKSOURCE_PLL2;
+      HAL_RCCEx_PeriphCLKConfig(&RCC_PeriphClkInit);
+
+      /* 使能ADC时钟 */
+      RHEOSTAT_ADC_MASTER_CLK_ENABLE();
+      /* 使能DMA时钟 */
       RHEOSTAT_ADC_DMA_CLK_ENABLE();
-      // 数据传输通道
-      DMA_Init_Handle.Instance = RHEOSTAT_ADC_DMA_STREAM;
-      // 数据传输方向为外设到存储器
-      DMA_Init_Handle.Init.Direction = DMA_PERIPH_TO_MEMORY;
-      // 外设寄存器只有一个，地址不用递增
-      DMA_Init_Handle.Init.PeriphInc = DMA_PINC_DISABLE;
-      // 存储器地址固定
-      DMA_Init_Handle.Init.MemInc = DMA_MINC_ENABLE;
-      // // 外设数据大小为半字，即两个字节
-      DMA_Init_Handle.Init.PeriphDataAlignment = DMA_PDATAALIGN_HALFWORD;
-      //  存储器数据大小也为半字，跟外设数据大小相同
-      DMA_Init_Handle.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
-      // 循环传输模式
-      DMA_Init_Handle.Init.Mode = DMA_CIRCULAR;
-      // DMA 传输通道优先级为高，当使用一个DMA通道时，优先级设置不影响
-      DMA_Init_Handle.Init.Priority = DMA_PRIORITY_HIGH;
-      // 禁止DMA FIFO ，使用直连模式
-      DMA_Init_Handle.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
-      // FIFO 大小，FIFO模式禁止时，这个不用配置
-      DMA_Init_Handle.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_HALFFULL;
-      DMA_Init_Handle.Init.MemBurst = DMA_MBURST_SINGLE;
-      DMA_Init_Handle.Init.PeriphBurst = DMA_PBURST_SINGLE;
-      // 选择 DMA 通道，通道存在于流中
-      DMA_Init_Handle.Init.Channel = RHEOSTAT_ADC_DMA_CHANNEL;
-      //初始化DMA流，流相当于一个大的管道，管道里面有很多通道
-      HAL_DMA_Init(&DMA_Init_Handle);
-      // 开启ADC时钟
-      RHEOSTAT_ADC1_CLK_ENABLE();
-      RHEOSTAT_ADC2_CLK_ENABLE();
-      RHEOSTAT_ADC3_CLK_ENABLE();
-      // -------------------ADC1 Init 结构体 参数 初始化----------------------
-      // ADC1
-      ADC_Handle1.Instance = RHEOSTAT_ADC1;
-      // 时钟为fpclk 4分频
-      ADC_Handle1.Init.ClockPrescaler = ADC_CLOCKPRESCALER_PCLK_DIV4;
-      // ADC 分辨率
-      ADC_Handle1.Init.Resolution = ADC_RESOLUTION_12B;
-      // 禁止扫描模式，多通道采集才需要
-      ADC_Handle1.Init.ScanConvMode = DISABLE;
-      // 连续转换
-      ADC_Handle1.Init.ContinuousConvMode = ENABLE;
-      // 非连续转换
-      ADC_Handle1.Init.DiscontinuousConvMode = DISABLE;
-      // 非连续转换个数
-      ADC_Handle1.Init.NbrOfDiscConversion   = 0;
-      //禁止外部边沿触发
-      ADC_Handle1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-      //使用软件触发，外部触发不用配置，注释掉即可
-      //ADC_Handle.Init.ExternalTrigConv      = ADC_EXTERNALTRIGCONV_T1_CC1;
-      //数据右对齐
-      ADC_Handle1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-      //转换通道个数
-      ADC_Handle1.Init.NbrOfConversion = 1;
-      //使能连续转换请求
-      ADC_Handle1.Init.DMAContinuousRequests = ENABLE;
-      //转换完成标志
-      ADC_Handle1.Init.EOCSelection          = DISABLE;
-      // 初始化ADC
-      HAL_ADC_Init(&ADC_Handle1);
-      //-------------------------------------------------------------------
-      // 配置 ADC1 通道13转换顺序为1，第一个转换，采样时间为3个时钟周期
-      ADC_Config.Channel      = RHEOSTAT_ADC_CHANNEL;
-      ADC_Config.Rank         = 1;
-      ADC_Config.SamplingTime = ADC_SAMPLETIME_3CYCLES;// 采样时间间隔
-      ADC_Config.Offset       = 0;
-      HAL_ADC_ConfigChannel(&ADC_Handle1, &ADC_Config);
-      // -------------------ADC2 Init 结构体 参数 初始化----------------------
-      // ADC2
-      ADC_Handle2.Instance = RHEOSTAT_ADC2;
-      // 时钟为fpclk 4分频
-      ADC_Handle2.Init.ClockPrescaler = ADC_CLOCKPRESCALER_PCLK_DIV4;
-      // ADC 分辨率
-      ADC_Handle2.Init.Resolution = ADC_RESOLUTION_12B;
-      // 禁止扫描模式，多通道采集才需要
-      ADC_Handle1.Init.ScanConvMode = DISABLE;
-      // 连续转换
-      ADC_Handle2.Init.ContinuousConvMode = ENABLE;
-      // 非连续转换
-      ADC_Handle2.Init.DiscontinuousConvMode = DISABLE;
-      // 非连续转换个数
-      ADC_Handle2.Init.NbrOfDiscConversion   = 0;
-      //禁止外部边沿触发
-      ADC_Handle2.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-      //使用软件触发，外部触发不用配置，注释掉即可
-      //ADC_Handle.Init.ExternalTrigConv      = ADC_EXTERNALTRIGCONV_T1_CC1;
-      //数据右对齐
-      ADC_Handle2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-      //转换通道个数
-      ADC_Handle2.Init.NbrOfConversion = 1;
-      //使能连续转换请求
-      ADC_Handle2.Init.DMAContinuousRequests = ENABLE;
-      //转换完成标志
-      ADC_Handle2.Init.EOCSelection          = DISABLE;
-      // 初始化ADC
-      HAL_ADC_Init(&ADC_Handle2);
-      // 配置 ADC2 通道13转换顺序为1，第一个转换，采样时间为3个时钟周期
-      ADC_Config.Channel      = RHEOSTAT_ADC_CHANNEL;
-      ADC_Config.Rank         = 1;
-      ADC_Config.SamplingTime = ADC_SAMPLETIME_3CYCLES; // 采样时间间隔
-      ADC_Config.Offset       = 0;
-      HAL_ADC_ConfigChannel(&ADC_Handle2, &ADC_Config);
+      /* 使能ADC_SLAVE时钟 */
+      RHEOSTAT_ADC_SLAVE_CLK_ENABLE();
 
-      // -------------------ADC33 Init 结构体 参数 初始化--------------------
-      // ADC3
-      ADC_Handle3.Instance = RHEOSTAT_ADC3;
-      // 时钟为fpclk 4分频
-      ADC_Handle3.Init.ClockPrescaler = ADC_CLOCKPRESCALER_PCLK_DIV4;
-      // ADC 分辨率
-      ADC_Handle3.Init.Resolution = ADC_RESOLUTION_12B;
-      // 禁止扫描模式，多通道采集才需要
-      ADC_Handle1.Init.ScanConvMode = DISABLE;
-      // 连续转换
-      ADC_Handle3.Init.ContinuousConvMode = ENABLE;
-      // 非连续转换
-      ADC_Handle3.Init.DiscontinuousConvMode = DISABLE;
-      // 非连续转换个数
-      ADC_Handle3.Init.NbrOfDiscConversion   = 0;
-      //禁止外部边沿触发
-      ADC_Handle3.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
-      //使用软件触发，外部触发不用配置，注释掉即可
-      //ADC_Handle.Init.ExternalTrigConv      = ADC_EXTERNALTRIGCONV_T1_CC1;
-      //数据右对齐
-      ADC_Handle3.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-      //转换通道个数
-      ADC_Handle3.Init.NbrOfConversion = 1;
-      //使能连续转换请求
-      ADC_Handle3.Init.DMAContinuousRequests = ENABLE;
-      //转换完成标志
-      ADC_Handle3.Init.EOCSelection          = DISABLE;
-      // 初始化ADC
-      HAL_ADC_Init(&ADC_Handle3);
-      // 配置 ADC3 通道13转换顺序为1，第一个转换，采样时间为3个时钟周期
-      ADC_Config.Channel      = RHEOSTAT_ADC_CHANNEL;
-      ADC_Config.Rank         = 1;
-      ADC_Config.SamplingTime = ADC_SAMPLETIME_3CYCLES;// 采样时间间隔
-      ADC_Config.Offset       = 0;
-      HAL_ADC_ConfigChannel(&ADC_Handle3, &ADC_Config);
+      //选择DMA1的Stream1
+      hdma_adc.Instance = RHEOSTAT_ADC_DMA_Base;
+      //ADC1的DMA请求
+      hdma_adc.Init.Request = RHEOSTAT_ADC_DMA_Request;
+      //传输方向：外设-》内存
+      hdma_adc.Init.Direction = DMA_PERIPH_TO_MEMORY;
+      //外设地址不自增
+      hdma_adc.Init.PeriphInc = DMA_PINC_DISABLE;
+      //内存地址不自增
+      hdma_adc.Init.MemInc = DMA_PINC_DISABLE;
+      //外设数据宽度：半字
+      hdma_adc.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
+      //内存数据宽度：半字
+      hdma_adc.Init.MemDataAlignment = DMA_PDATAALIGN_WORD;
+      //DMA循环传输
+      hdma_adc.Init.Mode = DMA_CIRCULAR;
+      //DMA的软件优先级：低
+      hdma_adc.Init.Priority = DMA_PRIORITY_LOW;
+      //FIFO模式关闭
+      hdma_adc.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+      //DMA初始化
+      HAL_DMA_Init(&hdma_adc);
+      //hdma_adc和ADC_Handle.DMA_Handle链接
+      __HAL_LINKDMA(&ADC_Handle,DMA_Handle,hdma_adc);
 
-      /*配置三重AD采样*/
-      mode.Mode = ADC_TRIPLEMODE_INTERL;
-      mode.DMAAccessMode = ADC_DMAACCESSMODE_2;
-      mode.TwoSamplingDelay = ADC_TWOSAMPLINGDELAY_5CYCLES;
 
-      HAL_ADCEx_MultiModeConfigChannel(&ADC_Handle1, &mode);
+      ADC_Handle.Instance = RHEOSTAT_ADC_MASTER;
+      //使能Boost模式
+      ADC_Handle.Init.BoostMode = ENABLE;
+      //ADC时钟1分频
+      ADC_Handle.Init.ClockPrescaler = ADC_CLOCK_ASYNC_DIV1;
+      //使能连续转换模式
+      ADC_Handle.Init.ContinuousConvMode = ENABLE;
+      //数据存放在数据寄存器中
+      ADC_Handle.Init.ConversionDataManagement = ADC_CONVERSIONDATA_DMA_CIRCULAR;
+      //关闭不连续转换模式
+      ADC_Handle.Init.DiscontinuousConvMode = DISABLE;
+      //单次转换
+      ADC_Handle.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
+      //软件触发
+      ADC_Handle.Init.ExternalTrigConv = ADC_SOFTWARE_START;
+      //关闭低功耗自动等待
+      ADC_Handle.Init.LowPowerAutoWait = DISABLE;
+      //数据溢出时，覆盖写入
+      ADC_Handle.Init.Overrun = ADC_OVR_DATA_OVERWRITTEN;
+      //不使能过采样模式
+      ADC_Handle.Init.OversamplingMode = DISABLE;
+      //分辨率为：16bit
+      ADC_Handle.Init.Resolution = ADC_RESOLUTION_16B;
+      //不使能多通道扫描
+      ADC_Handle.Init.ScanConvMode = DISABLE;
+      //初始化 ADC_MASTER
+      HAL_ADC_Init(&ADC_Handle);
+      //初始化 ADC_SLAVE
+      ADC_SLAVE_Handle.Instance = RHEOSTAT_ADC_SLAVE;
+      ADC_SLAVE_Handle.Init = ADC_Handle.Init;
+      HAL_ADC_Init(&ADC_SLAVE_Handle);
 
-      HAL_ADC_Start(&ADC_Handle2);
-      HAL_ADC_Start(&ADC_Handle3);
-
-      __HAL_LINKDMA(&ADC_Handle1, DMA_Handle, DMA_Init_Handle);
-      __HAL_LINKDMA(&ADC_Handle2, DMA_Handle, DMA_Init_Handle);
-      __HAL_LINKDMA(&ADC_Handle3, DMA_Handle, DMA_Init_Handle);
-      HAL_ADCEx_MultiModeStart_DMA(&ADC_Handle1, (uint32_t *)ADC_ConvertedValue, 3);
+      //使用通道18
+      ADC_Config.Channel = RHEOSTAT_ADC_MASTER_CHANNEL;
+      //转换顺序为1
+      ADC_Config.Rank = ADC_REGULAR_RANK_1;
+      //采样周期为64.5个周期
+      ADC_Config.SamplingTime = ADC_SAMPLETIME_64CYCLES_5;
+      //不使用差分输入的功能
+      ADC_Config.SingleDiff = ADC_SINGLE_ENDED ;
+      //配置ADC_MASTER通道
+      HAL_ADC_ConfigChannel(&ADC_Handle, &ADC_Config);
+      //配置ADC_SLAVE通道
+      HAL_ADC_ConfigChannel(&ADC_SLAVE_Handle, &ADC_Config);
+   
+      //使能ADC1、2
+      ADC_Enable(&ADC_Handle);
+      ADC_Enable(&ADC_SLAVE_Handle);
+   
+      //数据格式
+      ADC_multimode.DualModeData = ADC_DUALMODEDATAFORMAT_32_10_BITS;
+      //双重ADC交替模式
+      ADC_multimode.Mode = ADC_DUALMODE_INTERL;
+      //ADC_MASTER和ADC_SLAVE采样间隔3个ADC时钟
+      ADC_multimode.TwoSamplingDelay = ADC_TWOSAMPLINGDELAY_3CYCLES;
+      //ADC双重模式配置初始化
+      HAL_ADCEx_MultiModeConfigChannel(&ADC_Handle, &ADC_multimode);
+      //使能DMA
+      HAL_ADCEx_MultiModeStart_DMA(&ADC_Handle, (uint32_t*)&ADC_ConvertedValue, 1);
+   
    }
 
 首先，我们使用了DMA_HandleTypeDef定义了一个DMA初始化类型变量，该结构体内容我们在DMA篇已经做了非常详细的讲解；另外还使用ADC_HandleTypeDef和ADC_ChannelConfTypeDef结构体分别定义一个ADC初始化和ADC通道配置变量，这两个结构体我们之前已经有详细讲解。
 
-调用RHEOSTAT_ADC_DMA_CLK_ENABLE()和RHEOSTAT_ADC_CLK_ENABLE()函数开启ADC时钟以及开启DMA时钟。
+调用RHEOSTAT_ADC_DMA_CLK_ENABLE ()，RHEOSTAT_ADC_MASTER_CLK_ENABLE ()和RHEOSTAT_ADC_SLAVE_CLK_ENABLE()函数开启ADC时钟以及开启DMA时钟。
 
-我们需要对DMA进行必要的配置。首先设置外设基地址就是ADC的通用规则数据寄存器地址；存储器的地址就是我们指定的数据存储区空间，ADC_ConvertedValue是我们定义的一个全局数组名，它是一个无符号32位有三个元素的整数数字；ADC规则转换对应只有一个数据寄存器所以地址不能递增，我们指定的存储区也需要递增地址。ADC的通用规则数据寄存器是32位有效，我们配置ADC为DMA模式2，设置数据大小为字大小。ADC配置为连续转换模式DMA也设置为循环传输模式。设置好DMA相关参数后就使能DMA的ADC通道。
+我们需要对DMA进行必要的配置。首先设置外设基地址就是ADC的通用规则数据寄存器地址；存储器的地址就是我们指定的数据存储区空间，ADC_ConvertedValue是我们定义的一个全局变量名，它是一个无符号32位的整型数据；ADC规则转换对应只有一个数据寄存器所以地址不能递增，我们指定的存储区也需要递增地址。ADC的通用规则数据寄存器是32位有效，我们配置DMA模式，设置数据大小为字大小。ADC配置为连续转换模式，DMA也设置为循环传输模式。设置好DMA相关参数后就使能DMA的ADC通道。
 
-接下来我们使用ADC_InitTypeDef结构体变量ADC_InitStructure来配置ADC1为12位分辨率、不使用扫描模式、启动连续转换、使用内部软件触发无需外部触发事件、使用右对齐数据格式、转换通道为1，并调用ADC_Init函数完成ADC1工作环境配置。ADC2和ADC3使用与ADC1相同配置即可。
+接下来我们使用ADC_HandleTypeDef结构体变量ADC_InitStructure来配置ADC1为16位分辨率、不使用扫描模式、启动连续转换、使用内部软件触发无需外部触发事件、使用右对齐数据格式、转换通道为1，并调用ADC_Init函数完成ADC1工作环境配置。ADC2使用与ADC1相同配置即可。
 
 ADC_ChannelConfTypeDef函数用来绑定ADC通道转换顺序和采样时间。绑定ADC通道引脚并设置相应的转换顺序。
 
-接下来我们使用ADC_MultiModeTypeDef结构体变量mode来配置ADC为三重ADC交替模式、分频系数为4、需要设置DMA模式2、10个周期的采样延迟。
+接下来我们使用ADC_MultiModeTypeDef结构体变量ADC_multimode来配置ADC为双重ADC交替模式、3个周期的采样延迟、数据格式选择32位数据格式。
 
 HAL_ADC_Start函数控制ADC转换启动。
 
-HAL_ADCEx_MultiModeConfigChannel函数控制是否使能ADC的DMA请求，如果使能请求，并调用HAL_ADCEx_MultiModeStart_DMA函数使能DMA，则在ADC转换完成后就请求DMA实现数据传输。三重模式只需使能ADC1的DMA通道。
+HAL_ADCEx_MultiModeConfigChannel函数控制是否使能ADC的DMA请求，如果使能请求，并调用HAL_ADCEx_MultiModeStart_DMA函数使能DMA，则在ADC转换完成后就请求DMA实现数据传输。双重模式只需使能ADC1的DMA通道，并且转换后的结果放在ADC1和ADC2的公共数据寄存器CDR中，主ADC的转换结果放在CDR的低16位，从ADC的转换结果放在CDR的高16位。
 
 主函数
 =============
@@ -1226,41 +1183,43 @@ HAL_ADCEx_MultiModeConfigChannel函数控制是否使能ADC的DMA请求，如果
 
    int main(void)
    {
-      /* 配置系统时钟为216 MHz */
+
+      /* 系统时钟初始化成400MHz */
       SystemClock_Config();
 
-      /* 初始化USART1 配置模式为 115200 8-N-1 */
-      UARTx_Config();
+      /* 配置串口1为：115200 8-N-1 */
+      DEBUG_USART_Config();
 
-      Rheostat_Init();
+      /* ADC初始化子程序 */
+      ADC_Init();
+
       while (1) {
-            Delay(0xffffee);
+         Delay(0xffffee);
+         //双ADC交替采样：ADC_MASTER的采样值存放在低16位；
+         //              ADC_SLAVE的采样值存放在高16位；
+         ADC_ConvertedValueLocal[0] = (uint16_t)ADC_ConvertedValue;
+         ADC_ConvertedValueLocal[1]=(uint16_t)((ADC_ConvertedValue&0xFFFF0000)>>16);
 
-            DC_ConvertedValueLocal[0] =(float)((uint16_t)ADC_ConvertedValue[0]*3.3/4096);
-            ADC_ConvertedValueLocal[1] =(float)((uint16_t)ADC_ConvertedValue[1]*3.3/4096);
-            ADC_ConvertedValueLocal[2] =(float)((uint16_t)ADC_ConvertedValue[2]*3.3/4096);
+         ADC_vol[0]=(float)((uint16_t)ADC_ConvertedValueLocal[0]*3.3/65536);
+         ADC_vol[1]=(float)((uint16_t)ADC_ConvertedValueLocal[1]*3.3/65536);
 
-            printf("\r\n The current AD value = 0x%08X \r\n", ADC_ConvertedValue[0]);
-            printf("\r\n The current AD value = 0x%08X \r\n", ADC_ConvertedValue[1]);
-            printf("\r\n The current AD value = 0x%08X \r\n", ADC_ConvertedValue[2]);
-
-            printf("\r\n The current ADC1 value = %f V \r\n",ADC_ConvertedValueLocal[0]);
-            printf("\r\n The current ADC2 value = %f V \r\n",ADC_ConvertedValueLocal[1]);
-            printf("\r\n The current ADC3 value = %f V \r\n",ADC_ConvertedValueLocal[2]);
+         printf("\r\n The current AD value = x%08X\r\n",ADC_ConvertedValueLocal[0]);
+         printf("\r\n The current AD value = x%08X\r\n",ADC_ConvertedValueLocal[1]);
+         //读取转换的AD值
+         printf("\r\n The current ADC1 value = %f V \r\n",ADC_vol[0]);
+         printf("\r\n The current ADC2 value = %f V \r\n",ADC_vol[1]);
       }
    }
 
-主函数先初始化系统时钟再调用USARTx_Config函数配置调试串口相关参数，函数定义在bsp_debug_usart.c文件中。
+主函数先初始化系统时钟再调用DEBUG_USART_Config()函数配置调试串口相关参数，函数定义在bsp_debug_usart.c文件中。
 
-接下来调用Rheostat_Init函数进行ADC初始化配置并启动ADC。Rheostat_Init函数是定义在bsp_adc.c文件中，
-它只是简单的分别调用Rheostat_ADC_GPIO_Config()和Rheostat_ADC_Mode_Config ()。
+接下来调用ADC_Init()函数进行ADC初始化配置并启动ADC。ADC_Init()函数是定义在bsp_adc.c文件中，它只是简单的分别调用ADC_GPIO_Mode_Config()和ADC_Mode_Config()。
 
 Delay函数只是一个简单的延时函数。
 
-我们配置了DMA数据传输所以它会自动把ADC转换完成后数据保存到数组变量ADC_ConvertedValue内，根据DMA模式2的数据存放规则，ADC_ConvertedValue[0]的低16位存放ADC1数据、高16位存放ADC2数据，ADC_ConvertedValue[1]的低16位存放ADC3数据、高16位存放ADC1数据，ADC_ConvertedValue[2]的低16位存放ADC2数据、高16位存放ADC3数据，我们可以根据需要提取出对应ADC的转换结果数据。经过简单地计算就可以得到每个ADC对应的实际电压。
+我们配置了DMA数据传输所以它会自动把ADC转换完成后数据保存到数组变量ADC_ConvertedValue内，根据数据存放规则，ADC_ConvertedValue低16位存放ADC1数据、高16位存放ADC2数据，我们可以根据需要提取出对应ADC的转换结果数据。经过简单地计算就可以得到每个ADC对应的实际电压。
 
 最后就是把相关数据打印至串口调试助手。
-
 
 下载验证
 =============
