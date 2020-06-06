@@ -1,11 +1,11 @@
 DCMI—OV2640摄像头
 -----------------
 
-本章参考资料：《STM32H74xxx参考手册》、《STM32F7xx规格书》、库帮助文档《STM32F779xx_User_Manual.chm》。
+本章参考资料：《STM32H743用户手册》、《STM32H743xI规格书》、库帮助文档《STM32H753xx_User_Manual.chm》。
 
 关于开发板配套的OV2640摄像头参数可查阅《ov2640datasheet》配套资料获知。
 
-STM32F7芯片具有浮点运算单元，适合对图像信息使用DSP进行基本的图像处理，其处理速度比传统的8、16位机快得多，而且它还具有与摄像头通讯的专用DCMI接口，所以使用它驱动摄像头采集图像信息并进行基本的加工处理非常适合。本章讲解如何使用STM32驱动OV2640型号的摄像头。
+STM32H7芯片具有浮点运算单元，适合对图像信息使用DSP进行基本的图像处理，其处理速度比传统的8、16位机快得多，而且它还具有与摄像头通讯的专用DCMI接口，所以使用它驱动摄像头采集图像信息并进行基本的加工处理非常适合。本章讲解如何使用STM32驱动OV2640型号的摄像头。
 
 摄像头简介
 ~~~~~~~~~~
@@ -119,19 +119,19 @@ OV2640传感器采用BGA封装，它的前端是采光窗口，引脚都在背�
 
 (1) 控制寄存器
 
-    标号处的是OV2640的控制寄存器，它根据这些寄存器配置的参数来运行，而这些参数是由外部控制器通过SIO_C和SIO_D引脚写入的，SIO_C与SIO_D使用的通讯协议SCCB跟I2C十分类似，在STM32中我们完全可以直接用I2C硬件外设来控制。
+    标号1处的是OV2640的控制寄存器，它根据这些寄存器配置的参数来运行，而这些参数是由外部控制器通过SIO_C和SIO_D引脚写入的，SIO_C与SIO_D使用的通讯协议SCCB跟I2C十分类似，在STM32中我们完全可以直接用I2C硬件外设来控制。
 
 (1) 通信、控制信号及时钟
 
-    标号处包含了OV2640的通信、控制信号及外部时钟，其中PCLK、HREF及VSYNC分别是像素同步时钟、行同步信号以及帧同步信号，这与液晶屏控制中的信号是很类似的。RESETB引脚为低电平时，用于复位整个传感器芯片，PWDN用于控制芯片进入低功耗模式。注意最后的一个XCLK引脚，它跟PCLK是完全不同的，XCLK是用于驱动整个传感器芯片的时钟信号，是外部输入到OV2640的信号；而PCLK是OV2640输出数据时的同步信号，它是由OV2640输出的信号。XCLK可以外接晶振或由外部控制器提供，若要类比XCLK之于OV2640就相当于HSE时钟输入引脚与STM32芯片的关系，PCLK引脚可类比STM32的I2C外设的SCL引脚。
+    标号2处包含了OV2640的通信、控制信号及外部时钟，其中PCLK、HREF及VSYNC分别是像素同步时钟、行同步信号以及帧同步信号，这与液晶屏控制中的信号是很类似的。RESETB引脚为低电平时，用于复位整个传感器芯片，PWDN用于控制芯片进入低功耗模式。注意最后的一个XCLK引脚，它跟PCLK是完全不同的，XCLK是用于驱动整个传感器芯片的时钟信号，是外部输入到OV2640的信号；而PCLK是OV2640输出数据时的同步信号，它是由OV2640输出的信号。XCLK可以外接晶振或由外部控制器提供，若要类比XCLK之于OV2640就相当于HSE时钟输入引脚与STM32芯片的关系，PCLK引脚可类比STM32的I2C外设的SCL引脚。
 
 (1) 感光矩阵
 
-    标号处的是感光矩阵，光信号在这里转化成电信号，经过各种处理，这些信号存储成由一个个像素点表示的数字图像。
+    标号3处的是感光矩阵，光信号在这里转化成电信号，经过各种处理，这些信号存储成由一个个像素点表示的数字图像。
 
 (1) 数据输出信号
 
-    标号处包含了DSP处理单元，它会根据控制寄存器的配置做一些基本的图像处理运算。这部分还包含了图像格式转换单元及压缩单元，转换出的数据最终通过Y0-Y9引脚输出，一般来说我们使用8根据数据线来传输，这时仅使用Y2-Y9引脚，OV2640与外部器件的连接方式见
+    标号4处包含了DSP处理单元，它会根据控制寄存器的配置做一些基本的图像处理运算。这部分还包含了图像格式转换单元及压缩单元，转换出的数据最终通过Y0-Y9引脚输出，一般来说我们使用8根据数据线来传输，这时仅使用Y2-Y9引脚，OV2640与外部器件的连接方式见
     图45_0_4_ 。
 
 .. image:: media/image4.jpeg
@@ -279,7 +279,7 @@ Y2-Y9数据线会在1个像素同步时钟PCLK的驱动下发送1字节的数据
 STM32的DCMI接口简介
 ~~~~~~~~~~~~~~~~~~~
 
-STM32f7系列的控制器包含了DCMI数字摄像头接口(Digital camera
+STM32h7系列的控制器包含了DCMI数字摄像头接口(Digital camera
 Interface)，它支持使用上述类似VGA的时序获取图像数据流，支持原始的按行、帧格式来组织的图像数据，如YUV、RGB，也支持接收JPEG格式压缩的数据流。接收数据时，主要使用HSYNC及VSYNC信号来同步。
 
 DCMI整体框图
@@ -338,7 +338,7 @@ DCMI接口内部结构
 
 DCMI接口的内部结构见 图45_0_18_。
 
-.. image:: media/image18.jpeg
+.. image:: media/image18.jpg
    :align: center
    :alt: 图 45‑0-18 DCMI接口内部结构
    :name: 图45_0_18
@@ -396,7 +396,47 @@ DCMI还支持两种数据捕获模式，分别为快照模式和连续采集模�
 DCMI初始化结构体
 ~~~~~~~~~~~~~~~~
 
-与其它外设一样，STM32的DCMI外设也可以使用库函数来控制，其中最主要的配置项都封装到了DCMI_InitTypeDef结构体，来这些内容都定义在库文件“stm32f7xx_hal_dcmi.h”及“stm32f7xx_hal_dcmi.c”中，编程时我们可以结合这两个文件内的注释使用或参考库帮助文档。
+与其它外设一样，STM32的DCMI外设也可以使用库函数来控制，其中最主要的配置项都封装到了DCMI_InitTypeDef结构体，来这些内容都定义在库文件“stm32h7xx_hal_dcmi.h”及“stm32h7xx_hal_dcmi.c”中，编程时我们可以结合这两个文件内的注释使用或参考库帮助文档。
+
+代码清单 DCMI外设管理结构体（stm32h7xx_hal_dcmi.h文件）
+
+.. code-block:: c
+   :name: 代码清单 DCMI外设管理结构体
+
+    typedef struct {
+        DCMI_TypeDef                  *Instance; /*!< DCMI外设寄存器基地址*/
+        DCMI_InitTypeDef              Init; /*!< DCMI初始化结构体*/
+        HAL_LockTypeDef               Lock; /*!< DCMI锁资源*/
+        __IO HAL_DCMI_StateTypeDef    State; /*!< DCMI工作状态*/
+        __IO uint32_t                 XferCount;/*!< DMA传输计算值*/
+        __IO uint32_t                 XferSize; /*!< DMA数据的大小*/
+        uint32_t                      XferTransferNumber;/*!< DMA数据的个数*/
+        uint32_t                      pBuffPtr; /*!< 数据保存地址*/
+        DMA_HandleTypeDef             *DMA_Handle; /*!< DMA外设管理结构体 */
+        __IO uint32_t                 ErrorCode; /*!< DCMI错误执行操作值*/
+    } DCMI_HandleTypeDef;
+
+(1)	Instance基地址：DCMI寄存器基地址指针，所有参数都是指定基地址后才能正确写入寄存器。
+
+(2)	Init初始化结构体：DCMI 的初始化结构体，下面会详细讲解每一个成员。
+
+(3)	Lock：DCMI锁资源。
+
+(4)	State：DCMI的工作状态。正常工作的情况下，该值为HAL_DCMI_STATE_BUSY。
+
+(5)	XferCount：用来保存DMA传输数据的计数值。
+
+(6)	XferSize：DMA需要传输的数据大小。
+
+(7)	XferTransferNumber：DMA需要传输的数据个数。
+
+(8)	pBuffPtr：指针类型变量，指向数据保存地址，也就是DMA的目标地址。
+
+(9)	DMA_Handle：DMA外设管理结构体，用来配置DMA的工作模式。
+
+(10) ErrorCode：DCMI的错误执行操作返回值。
+
+以上的成员，我们一般在初始化的时候，只需要关注第一个和第二个参数。至于其他的结构体成员，当我们调用HAL库函数时，HAL库会自动根据外设当前的状态进行赋值。
 
 DCMI_InitTypeDef初始化结构体的内容见代码清单 45‑0-1。
 
@@ -553,55 +593,65 @@ XCLK引脚引出至外部，由外部控制器提供时钟；标号处的是摄�
 .. code-block:: c
    :name: 代码清单 45‑0-2 摄像头硬件配置相关的宏(省略了部分数据线)
 
+    /*引脚定义*/
+
+    #define SENSORS_I2C_SCL_GPIO_PORT             GPIOB
+    #define SENSORS_I2C_SCL_GPIO_CLK_ENABLE()     __GPIOB_CLK_ENABLE()
+    #define SENSORS_I2C_SCL_GPIO_PIN            GPIO_PIN_6
+
+    #define SENSORS_I2C_SDA_GPIO_PORT             GPIOB
+    #define SENSORS_I2C_SDA_GPIO_CLK_ENABLE()     __GPIOB_CLK_ENABLE()
+    #define SENSORS_I2C_SDA_GPIO_PIN              GPIO_PIN_7
+
+    #define SENSORS_I2C_AF                        GPIO_AF4_I2C1
+
+    #define SENSORS_I2C                         I2C1
+    #define SENSORS_I2C_RCC_CLK_ENABLE()        __HAL_RCC_I2C1_CLK_ENABLE()
+
+    #define SENSORS_I2C_FORCE_RESET()           __HAL_RCC_I2C1_FORCE_RESET()
+    #define SENSORS_I2C_RELEASE_RESET()         __HAL_RCC_I2C1_RELEASE_RESET()
+
     /*摄像头接口 */
     //IIC SCCB
-    #define CAMERA_I2C                          I2C1
-    #define CAMERA_I2C_CLK_ENABLE()             __HAL_RCC_I2C1_CLK_ENABLE()
+    #define CAMERA_I2C                          I2C4
+    #define CAMERA_I2C_CLK_ENABLE()             __HAL_RCC_I2C4_CLK_ENABLE()
 
-    #define CAMERA_I2C_SCL_PIN                  GPIO_PIN_6
-    #define CAMERA_I2C_SCL_GPIO_PORT            GPIOB
-    #define CAMERA_I2C_SCL_GPIO_CLK_ENABLE()    __HAL_RCC_GPIOB_CLK_ENABLE()
+    #define CAMERA_I2C_SCL_PIN                  GPIO_PIN_12
+    #define CAMERA_I2C_SCL_GPIO_PORT            GPIOD
+    #define CAMERA_I2C_SCL_GPIO_CLK_ENABLE()    __HAL_RCC_GPIOD_CLK_ENABLE()
+    #define CAMERA_I2C_SCL_AF                   GPIO_AF4_I2C4
 
-    #define CAMERA_I2C_SCL_AF                   GPIO_AF4_I2C1
-
-    #define CAMERA_I2C_SDA_PIN                  GPIO_PIN_7
-    #define CAMERA_I2C_SDA_GPIO_PORT            GPIOB
-    #define CAMERA_I2C_SDA_GPIO_CLK_ENABLE()    __HAL_RCC_GPIOB_CLK_ENABLE()
-
-    #define CAMERA_I2C_SDA_AF                   GPIO_AF4_I2C1
+    #define CAMERA_I2C_SDA_PIN                  GPIO_PIN_13
+    #define CAMERA_I2C_SDA_GPIO_PORT            GPIOD
+    #define CAMERA_I2C_SDA_GPIO_CLK_ENABLE()    __HAL_RCC_GPIOD_CLK_ENABLE()
+    #define CAMERA_I2C_SDA_AF                   GPIO_AF4_I2C4
 
     //VSYNC
     #define DCMI_VSYNC_GPIO_PORT              GPIOI
     #define DCMI_VSYNC_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOI_CLK_ENABLE()
-
     #define DCMI_VSYNC_GPIO_PIN               GPIO_PIN_5
-    #define DCMI_VSYNC_AF                 GPIO_AF13_DCMI
+    #define DCMI_VSYNC_AF                     GPIO_AF13_DCMI
     // HSYNC
     #define DCMI_HSYNC_GPIO_PORT              GPIOA
     #define DCMI_HSYNC_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOA_CLK_ENABLE()
-
     #define DCMI_HSYNC_GPIO_PIN               GPIO_PIN_4
-    #define DCMI_HSYNC_AF                 GPIO_AF13_DCMI
+    #define DCMI_HSYNC_AF                     GPIO_AF13_DCMI
     //PIXCLK
     #define DCMI_PIXCLK_GPIO_PORT             GPIOA
     #define DCMI_PIXCLK_GPIO_CLK_ENABLE()       __HAL_RCC_GPIOA_CLK_ENABLE()
-
     #define DCMI_PIXCLK_GPIO_PIN              GPIO_PIN_6
-    #define DCMI_PIXCLK_AF                  GPIO_AF13_DCMI
+    #define DCMI_PIXCLK_AF                    GPIO_AF13_DCMI
     //PWDN
-    #define DCMI_PWDN_GPIO_PORT                 GPIOG
-    #define DCMI_PWDN_GPIO_CLK_ENABLE()         __HAL_RCC_GPIOG_CLK_ENABLE()
-
-    #define DCMI_PWDN_GPIO_PIN                  GPIO_PIN_3
+    #define DCMI_PWDN_GPIO_PORT               GPIOG
+    #define DCMI_PWDN_GPIO_CLK_ENABLE()       __HAL_RCC_GPIOG_CLK_ENABLE()
+    #define DCMI_PWDN_GPIO_PIN                GPIO_PIN_3
 
     //数据信号线
     #define DCMI_D0_GPIO_PORT                 GPIOH
-    #define DCMI_D0_GPIO_CLK_ENABLE()           __HAL_RCC_GPIOH_CLK_ENABLE()
-
+    #define DCMI_D0_GPIO_CLK_ENABLE()         __HAL_RCC_GPIOH_CLK_ENABLE()
     #define DCMI_D0_GPIO_PIN                  GPIO_PIN_9
-    #define DCMI_D0_AF                      GPIO_AF13_DCMI
-    /*....省略部分数据线*/
-
+    #define DCMI_D0_AF                        GPIO_AF13_DCMI 
+    /*....省略部分数据线*/ 
 
 以上代码根据硬件的连接，把与DCMI、I2C接口与摄像头通讯使用的引脚号、引脚源以及复用功能映射都以宏封装起来。
 
@@ -760,35 +810,44 @@ XCLK引脚引出至外部，由外部控制器提供时钟；标号处的是摄�
 .. code-block:: c
    :name: 代码清单 45‑0-5 配置DCMI的模式(bsp_ov2640.c文件)
 
-   /**
-   * @brief  配置 DCMI/DMA 以捕获摄像头数据
-   * @param  None
-   * @retval None
-   */
-   void OV2640_Init(void)
-   {
-      /*** 配置DCMI接口 ***/
-      /* 使能DCMI时钟 */
-      __HAL_RCC_DCMI_CLK_ENABLE();
+     /**
+    * @brief  配置 DCMI/DMA 以捕获摄像头数据
+    * @param  None
+    * @retval None
+    */
+    void OV2640_Init(void)
+    {
+        /*** 配置DCMI接口 ***/
+        /* 使能DCMI时钟 */
+        __HAL_RCC_DCMI_CLK_ENABLE();
 
-      /* DCMI 配置*/
-      DCMI_Handle.Instance              = DCMI;
-      DCMI_Handle.Init.SynchroMode      = DCMI_MODE_CONTINUOUS;
-      DCMI_Handle.Init.SynchroMode      = DCMI_SYNCHRO_HARDWARE;
-      DCMI_Handle.Init.PCKPolarity      = DCMI_PCKPOLARITY_RISING;
-      DCMI_Handle.Init.VSPolarity       = DCMI_VSPOLARITY_LOW;
-      DCMI_Handle.Init.HSPolarity       = DCMI_HSPOLARITY_LOW;
-      DCMI_Handle.Init.CaptureRate      = DCMI_CR_ALL_FRAME;
-      DCMI_Handle.Init.ExtendedDataMode = DCMI_EXTEND_DATA_8B;
-      HAL_DCMI_Init(&DCMI_Handle);
+        /* DCMI 配置*/
+        //DCMI外设寄存器基地址
+        DCMI_Handle.Instance              = DCMI;
+        //连续采集模式
+        DCMI_Handle.Init.SynchroMode      = DCMI_MODE_CONTINUOUS;
+        //连续采集模式
+        DCMI_Handle.Init.SynchroMode      = DCMI_SYNCHRO_HARDWARE;
+        //像素时钟上升沿有效
+        DCMI_Handle.Init.PCKPolarity      = DCMI_PCKPOLARITY_RISING;
+        //VSP低电平有效
+        DCMI_Handle.Init.VSPolarity       = DCMI_VSPOLARITY_LOW;
+        //HSP低电平有效
+        DCMI_Handle.Init.HSPolarity       = DCMI_HSPOLARITY_LOW;
+        //全采集
+        DCMI_Handle.Init.CaptureRate      = DCMI_CR_ALL_FRAME;
+        //8位数据宽度
+        DCMI_Handle.Init.ExtendedDataMode = DCMI_EXTEND_DATA_8B;
+        HAL_DCMI_Init(&DCMI_Handle);
 
-      /* 配置中断 */
-      HAL_NVIC_SetPriority(DCMI_IRQn, 5, 0);
-      HAL_NVIC_EnableIRQ(DCMI_IRQn);
+        /* 配置中断 */
+        HAL_NVIC_SetPriority(DCMI_IRQn, 0 ,5);
+        HAL_NVIC_EnableIRQ(DCMI_IRQn);
 
-      //开始传输，数据大小以32位数据为单位(即像素个数/4，LCD_GetXSize()*LCD_GetYSize()*2/4)
-      OV2640_DMA_Config(LCD_FB_START_ADDRESS,LCD_GetXSize()*LCD_GetYSize()/2);
-   }
+        //开始传输，数据大小以32位数据为单位(即像素个数/4，LCD_GetXSize()
+                                                            *LCD_GetYSize()*2/4)
+        OV2640_DMA_Config(LCD_FB_START_ADDRESS, LCD_GetXSize()*LCD_GetYSize()/2);
+    }
 
 该函数的执行流程如下：
 
@@ -826,30 +885,30 @@ XCLK引脚引出至外部，由外部控制器提供时钟；标号处的是摄�
         /* 使能DMA*/
         __HAL_RCC_DMA2_CLK_ENABLE();
         DMA_Handle_dcmi.Instance = DMA2_Stream1;
-        DMA_Handle_dcmi.Init.Channel = DMA_CHANNEL_1;
+        DMA_Handle_dcmi.Init.Request = DMA_REQUEST_DCMI;
         DMA_Handle_dcmi.Init.Direction = DMA_PERIPH_TO_MEMORY;
         DMA_Handle_dcmi.Init.PeriphInc = DMA_PINC_DISABLE;
         DMA_Handle_dcmi.Init.MemInc = DMA_MINC_ENABLE;      //寄存器地址自增
         DMA_Handle_dcmi.Init.PeriphDataAlignment = DMA_PDATAALIGN_WORD;
         DMA_Handle_dcmi.Init.MemDataAlignment = DMA_MDATAALIGN_HALFWORD;
         DMA_Handle_dcmi.Init.Mode = DMA_CIRCULAR;               //循环模式
-        DMA_Handle_dcmi.Init.Priority = DMA_PRIORITY_HIGH;
-        DMA_Handle_dcmi.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
+        DMA_Handle_dcmi.Init.Priority = DMA_PRIORITY_VERY_HIGH;
+        DMA_Handle_dcmi.Init.FIFOMode = DMA_FIFOMODE_ENABLE;
         DMA_Handle_dcmi.Init.FIFOThreshold = DMA_FIFO_THRESHOLD_FULL;
-        DMA_Handle_dcmi.Init.MemBurst = DMA_MBURST_SINGLE;
+        DMA_Handle_dcmi.Init.MemBurst = DMA_MBURST_INC8;
         DMA_Handle_dcmi.Init.PeriphBurst = DMA_PBURST_SINGLE;
-
+    
+        HAL_DMA_Init(&DMA_Handle_dcmi);
         /*DMA中断配置 */
         __HAL_LINKDMA(&DCMI_Handle, DMA_Handle, DMA_Handle_dcmi);
-
-        HAL_NVIC_SetPriority(DMA2_Stream1_IRQn, 5, 0);
+    
+        HAL_NVIC_SetPriority(DMA2_Stream1_IRQn, 0, 0);
         HAL_NVIC_EnableIRQ(DMA2_Stream1_IRQn);
-
-        HAL_DMA_Init(&DMA_Handle_dcmi);
+    
         //使能DCMI采集数据
-        HAL_DCMI_Start_DMA(&DCMI_Handle, DCMI_MODE_CONTINUOUS,
-        (uint32_t)DMA_Memory0BaseAddr,DMA_BufferSize);
-    }
+        HAL_DCMI_Start_DMA(&DCMI_Handle, DCMI_MODE_CONTINUOUS, (uint32_t)DMA_Memory0BaseAddr,
+                            DMA_BufferSize);
+    }  
 
 该函数跟普通的DMA配置无异，它把DCMI接收到的数据从它的数据寄存器搬运到SDRAM显存中，从而直接使用液晶屏显示摄像头采集得的图像。它包含2个输入参数DMA_Memory0BaseAddr和DMA_BufferSize，其中DMA_Memory0BaseAddr用于设置本次DMA传输的目的首地址，
 DMA_BufferSize则用于指示本次DMA传输的数据量，要注意它的单位是一个字，即4字节，如我们要传输60字节的数据时，它应配置为15。这两参数会被传递到库函数HAL_DCMI_Start_DMA
@@ -875,7 +934,8 @@ OV2640_Init函数初始化了DCMI，使能了帧中断、DMA传输完成中断�
 当这一行数据传输完成时，会进入DMA中断服务函数，见45‑0-7 中的DMA2_Stream1_IRQHandler。
 
 .. code-block:: c
-   :name: 代码清单 45‑0-7 DMA传输完成中断与帧中断(stm32f7xx_it.c和bsp_ov2640.c文件)
+   :name: 代码清单 45‑0-7 DMA传输完成中断与帧中断(stm32h7xx_it.c和bsp_ov2640.c文件)
+   :caption: 代码清单 45‑0-7 DMA传输完成中断与帧中断(stm32h7xx_it.c和bsp_ov2640.c文件)
 
     /**
     * @brief  DMA中断服务函数
@@ -1036,7 +1096,7 @@ main函数
     int main(void)
     {
         OV2640_IDTypeDef OV2640_Camera_ID;
-        /* 系统时钟初始化成216 MHz */
+        /* 系统时钟初始化成400 MHz */
         SystemClock_Config();
         /* LED 端口初始化 */
         LED_GPIO_Config();

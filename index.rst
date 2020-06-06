@@ -86,6 +86,7 @@
    :titlesonly:
 
    submission/rst-testfile
+   submission/md-testfile.md
 
 
 .. toctree::

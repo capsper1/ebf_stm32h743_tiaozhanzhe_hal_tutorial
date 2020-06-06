@@ -867,7 +867,7 @@ main函数
 
         OV5640_IDTypeDef OV5640_Camera_ID;
 
-        /* 系统时钟初始化成216 MHz */
+        /* 系统时钟初始化成400 MHz */
         SystemClock_Config();
         /* LED 端口初始化 */
         LED_GPIO_Config();

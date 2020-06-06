@@ -4,6 +4,9 @@
 本章参考资料：《STM32H74xxx参考手册》、《STM32F7xx规格书》、库说明文档《STM32F779xx_User_Manual.chm》
 以及《Proprietary code read-out protection on microcontrollers》。
 
+.. attention::
+   本章内容以F7为例，与H7平台区别不太，可以参考。
+
 选项字节与读写保护
 ~~~~~~~~~~~~~~~~~~
 
@@ -528,7 +531,7 @@ main函数
 
    int main(void)
    {
-      /* 系统时钟初始化成216 MHz */
+      /* 系统时钟初始化成400 MHz */
       SystemClock_Config();
 
       /* LED 端口初始化 */

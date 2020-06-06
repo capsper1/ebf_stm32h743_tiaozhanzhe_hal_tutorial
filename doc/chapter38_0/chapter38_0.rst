@@ -214,8 +214,7 @@ USART外设的TXD引脚使用杜邦线连接到RXD引脚可进行自收发测试
 使用中断接收数据
 ...................
 
-接下来我们编写在USART中断服务函数中接收数据的相关过程，见 代码清单40_0_3_
-，其中的bsp_RS485_IRQHandler函数直接被bsp_stm32f4xx_it.c文件的USART中断服务函数调用，不在此列出。
+接下来我们编写在USART中断服务函数中接收数据的相关过程，见 代码清单40_0_3_。
 
 代码清单 40‑3 中断接收数据的过程(bsp_485.c文件)
 
@@ -331,53 +330,56 @@ main函数
         char *pbuf;
         uint16_t len;
 
-        /* 配置系统时钟为180 MHz */
+        /* 使能指令缓存 */
+        SCB_EnableICache();
+        /* 使能数据缓存 */
+        SCB_EnableDCache();
+        /* 系统时钟初始化成400MHz */
         SystemClock_Config();
-
-        /* 初始化RGB彩灯 */
-        LED_GPIO_Config();
-
-        /* 初始化USART1 配置模式为 115200 8-N-1 */
-        UARTx_Config();
-        /*初始化485使用的串口，使用中断模式接收*/
         _485_Config();
+        /* LED 端口初始化 */
+        LED_GPIO_Config();
+        LED_BLUE;
 
+        /* 配置串口1为：115200 8-N-1 */
+        DEBUG_USART_Config();
+        /* 初始化独立按键 */
         Key_GPIO_Config();
 
-        printf("\r\n 欢迎使用野火  STM32 H743 开发板。\r\n");
-        printf("\r\n 野火H743 485通讯实验例程\r\n");
+        printf("\r\n 欢迎使用野火 STM32H743-挑战者开发板。\r\n");
+        printf("\r\n 野火 STM32H743-挑战者 485通讯实验例程\r\n");
 
         printf("\r\n 实验步骤：\r\n");
 
         printf("\r\n 1.使用导线连接好两个485通讯设备\r\n");
-        printf("\r\n 2.使用跳线帽连接好:5v --- C/4-5V,485-D --- PD5,485-R ---PD6 \r\n");
+        printf("\r\n 2.使用跳线帽连接好:5v --- C/4-5V,485-D --- PA2,485-R ---PA3 \r\n");
         printf("\r\n 3.若使用两个野火开发板进行实验，给两个开发板都下载本程序即可。\r\n");
-        printf("\r\n 4.准备好后，按下其中一个开发板的KEY1键，会使用485向外发送0-255的数字 \r\n");
+        printf("\r\n 4.准备好后，按下其中一个开发板的KEY1键，会用485向外发送0-255的数字 \r\n");
         printf("\r\n 5.若开发板的485接收到256个字节数据，会把数据以16进制形式打印出来。 \r\n");
-
         while (1) {
             /*按一次按键发送一次数据*/
             if (  Key_Scan(KEY1_GPIO_PORT,KEY1_PIN) == KEY_ON) {
                 uint16_t i;
-
+    
                 LED_BLUE;
-
+    
                 _485_TX_EN();
-
+    
                 for (i=0; i<=0xff; i++) {
                     _485_SendByte(i);  //发送数据
                 }
-
+    
                 /*加短暂延时，保证485发送数据完毕*/
                 Delay(0xFFF);
                 _485_RX_EN();
-
+    
                 LED_GREEN;
-
-                printf("\r\n发送数据成功！\r\n"); //使用调试串口打印调试信息到终端
-
+    
+                printf("\r\n发送数据成功！\r\n");  //使用调试串口打印调试信息到终端
+    
             } else {
                 LED_BLUE;
+    
                 pbuf = get_rebuff(&len);
                 if (len>=256) {
                     LED_GREEN;

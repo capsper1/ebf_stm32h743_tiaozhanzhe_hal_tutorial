@@ -204,7 +204,7 @@ Significant Bit），意为最ADC的低有效位。
 MPU6050简介
 ~~~~~~~~~~~~~~~
 
-接下来我们使用传感器实例来讲解如何检测物体的姿态。在我们的STM32f7实验板上有一个MPU6050芯片，
+接下来我们使用传感器实例来讲解如何检测物体的姿态。在我们的STM32h7实验板上有一个MPU6050芯片，
 它是一种六轴传感器模块，采用InvenSense公司的MPU6050作为主芯片，能同时检测三轴加速度、
 三轴陀螺仪(三轴角速度)的运动数据以及温度数据。利用MPU6050芯片内部的DMP模块（
 Digital Motion Processor数字运动处理器），可对传感器数据进行滤波、融合处理，
@@ -680,7 +680,7 @@ main函数
       static short Gyro[3];
       static float Temp;
 
-      /* 系统时钟初始化成216 MHz */
+      /* 系统时钟初始化成400 MHz */
       SystemClock_Config();
       /* LED 端口初始化 */
       LED_GPIO_Config();
@@ -901,7 +901,7 @@ MPL软件库中使用到了延时及时间戳功能，要求需要提供delay_ms
 见 代码清单46_12_。
 systick被配置为每毫秒产生一次中断，而每次中断中会对TimingDelay变量减1，对g_ul_ms_ticks变量加1。它们分别用于Delay_ms函数利用TimingDelay的值进行阻塞延迟，而get_tick_count函数获取的时间戳即g_ul_ms_ticks的值。
 
-代码清单 46‑12 Systick的中断服务函数(stm32f7xx_it.c文件)
+代码清单 46‑12 Systick的中断服务函数(stm32h7xx_it.c文件)
 
 .. code-block:: c
    :name: 代码清单46_12
@@ -978,7 +978,7 @@ MPU6050的中断接口
 与我们上一小节中的基础实验不同，为了高效处理采样数据，MPL代码库使用了MPU6050的INT中断信号，为此我们要给提供中断接口，见
 代码清单46_14_。
 
-代码清单 46‑14中断接口(stm32f7xx_it.c文件)
+代码清单 46‑14中断接口(stm32h7xx_it.c文件)
 
 .. code-block:: c
    :name: 代码清单46_14
@@ -1039,7 +1039,7 @@ main函数执行流程
       unsigned short gyro_rate, gyro_fsr;
       unsigned long timestamp;
       struct int_param_s int_param;
-      /* 系统时钟初始化成216 MHz */
+      /* 系统时钟初始化成400 MHz */
       SysTick_Init();
       LED_GPIO_Config();
       /*初始化USART1*/
@@ -1409,7 +1409,8 @@ USE_LCD_DISPLAY宏内的代码)，它把这些数据输出到实验板上的液�
 
 本实验适用于官方提供的Python上位机，它可以把采样的数据传送到上位机，上位机会显示三维模式的姿态。
 
-注意：以下内容仅针对有Python编程语言基础的用户，若您不会Python，而又希望观察到三维模型的姿态，请参考下一小节的实验，它的使用更为简单。
+.. attention::
+   以下内容仅针对有Python编程语言基础的用户，若您不会Python，而又希望观察到三维模型的姿态，请参考下一小节的实验，它的使用更为简单。
 
 Python上位机源代码及说明
 ==========================

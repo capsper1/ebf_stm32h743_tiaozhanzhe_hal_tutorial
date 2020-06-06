@@ -1,11 +1,11 @@
 DCMI—OV5640摄像头
 -----------------
 
-本章参考资料：《STM32H74xxx参考手册》、《STM32F7xx规格书》、库帮助文档《STM32F779xx_User_Manual.chm》。
+本章参考资料：《STM32H743用户手册》、《STM32H743xI规格书》、库帮助文档《STM32H753xx_User_Manual.chm》。
 
 关于开发板配套的OV5640摄像头参数可查阅《ov5640datasheet》配套资料获知。
 
-STM32F7芯片具有浮点运算单元，适合对图像信息使用DSP进行基本的图像处理，其处理速度比传统的8、16位机快得多，而且它还具有与摄像头通讯的专用DCMI接口，所以使用它驱动摄像头采集图像信息并进行基本的加工处理非常适合。本章讲解如何使用STM32驱动OV5640型号的摄像头。
+STM32H7芯片具有浮点运算单元，适合对图像信息使用DSP进行基本的图像处理，其处理速度比传统的8、16位机快得多，而且它还具有与摄像头通讯的专用DCMI接口，所以使用它驱动摄像头采集图像信息并进行基本的加工处理非常适合。本章讲解如何使用STM32驱动OV5640型号的摄像头。
 
 摄像头简介
 ~~~~~~~~~~
@@ -368,7 +368,46 @@ DCMI还支持两种数据捕获模式，分别为快照模式和连续采集模�
 DCMI初始化结构体
 ~~~~~~~~~~~~~~~~
 
-与其它外设一样，STM32的DCMI外设也可以使用库函数来控制，其中最主要的配置项都封装到了DCMI_InitTypeDef结构体，来这些内容都定义在库文件“stm32f7xx_hal_dcmi.h”及“stm32f7xx_hal_dcmi.c”中，编程时我们可以结合这两个文件内的注释使用或参考库帮助文档。
+与其它外设一样，STM32的DCMI外设也可以使用库函数来控制，其中最主要的配置项都封装到了DCMI_InitTypeDef结构体，来这些内容都定义在库文件“stm32h7xx_hal_dcmi.h”及“stm32h7xx_hal_dcmi.c”中，编程时我们可以结合这两个文件内的注释使用或参考库帮助文档。
+
+.. code-block:: c
+   :name: 代码清单 DCMI外设管理结构体（stm32h7xx_hal_dcmi.h文件）
+   :caption: 代码清单 DCMI外设管理结构体（stm32h7xx_hal_dcmi.h文件）
+
+    typedef struct {
+        DCMI_TypeDef                  *Instance; /*!< DCMI外设寄存器基地址*/
+        DCMI_InitTypeDef              Init; /*!< DCMI初始化结构体*/
+        HAL_LockTypeDef               Lock; /*!< DCMI锁资源*/
+        __IO HAL_DCMI_StateTypeDef    State; /*!< DCMI工作状态*/
+        __IO uint32_t                 XferCount;/*!< DMA传输计算值*/
+        __IO uint32_t                 XferSize; /*!< DMA数据的大小*/
+        uint32_t                      XferTransferNumber;/*!< DMA数据的个数*/
+        uint32_t                      pBuffPtr; /*!< 数据保存地址*/
+        DMA_HandleTypeDef             *DMA_Handle; /*!< DMA外设管理结构体 */
+        __IO uint32_t                 ErrorCode; /*!< DCMI错误执行操作值*/
+    } DCMI_HandleTypeDef;
+
+(1)	Instance基地址：DCMI寄存器基地址指针，所有参数都是指定基地址后才能正确写入寄存器。
+
+(2)	Init初始化结构体：DCMI 的初始化结构体，下面会详细讲解每一个成员。
+
+(3)	Lock：DCMI锁资源。
+
+(4)	State：DCMI的工作状态。正常工作的情况下，该值为HAL_DCMI_STATE_BUSY。
+
+(5)	XferCount：用来保存DMA传输数据的计数值。
+
+(6)	XferSize：DMA需要传输的数据大小。
+
+(7)	XferTransferNumber：DMA需要传输的数据个数。
+
+(8)	pBuffPtr：指针类型变量，指向数据保存地址，也就是DMA的目标地址。
+
+(9)	DMA_Handle：DMA外设管理结构体，用来配置DMA的工作模式。
+
+(10)	ErrorCode：DCMI的错误执行操作返回值。
+
+以上的成员，我们一般在初始化的时候，只需要关注第一个和第二个参数。至于其他的结构体成员，当我们调用HAL库函数时，HAL库会自动根据外设当前的状态进行赋值。
 
 DCMI_InitTypeDef初始化结构体的内容见代码清单 46-0‑1。
 
@@ -525,6 +564,24 @@ XCLK引脚引出至外部，由外部控制器提供时钟；标号处的是电�
 .. code-block:: c
    :name: 代码清单 46-0‑2 摄像头硬件配置相关的宏(省略了部分数据线)
 
+    /*引脚定义*/
+
+    #define SENSORS_I2C_SCL_GPIO_PORT             GPIOB
+    #define SENSORS_I2C_SCL_GPIO_CLK_ENABLE()     __GPIOB_CLK_ENABLE()
+    #define SENSORS_I2C_SCL_GPIO_PIN            GPIO_PIN_6
+
+    #define SENSORS_I2C_SDA_GPIO_PORT             GPIOB
+    #define SENSORS_I2C_SDA_GPIO_CLK_ENABLE()     __GPIOB_CLK_ENABLE()
+    #define SENSORS_I2C_SDA_GPIO_PIN              GPIO_PIN_7
+
+    #define SENSORS_I2C_AF                        GPIO_AF4_I2C1
+
+    #define SENSORS_I2C                         I2C1
+    #define SENSORS_I2C_RCC_CLK_ENABLE()        __HAL_RCC_I2C1_CLK_ENABLE()
+
+    #define SENSORS_I2C_FORCE_RESET()           __HAL_RCC_I2C1_FORCE_RESET()
+    #define SENSORS_I2C_RELEASE_RESET()         __HAL_RCC_I2C1_RELEASE_RESET()
+
     /*摄像头接口 */
     //IIC SCCB
     #define CAMERA_I2C                          I2C1
@@ -533,52 +590,40 @@ XCLK引脚引出至外部，由外部控制器提供时钟；标号处的是电�
     #define CAMERA_I2C_SCL_PIN                  GPIO_PIN_6
     #define CAMERA_I2C_SCL_GPIO_PORT            GPIOB
     #define CAMERA_I2C_SCL_GPIO_CLK_ENABLE()    __HAL_RCC_GPIOB_CLK_ENABLE()
-
     #define CAMERA_I2C_SCL_AF                   GPIO_AF4_I2C1
 
     #define CAMERA_I2C_SDA_PIN                  GPIO_PIN_7
     #define CAMERA_I2C_SDA_GPIO_PORT            GPIOB
     #define CAMERA_I2C_SDA_GPIO_CLK_ENABLE()    __HAL_RCC_GPIOB_CLK_ENABLE()
-
     #define CAMERA_I2C_SDA_AF                   GPIO_AF4_I2C1
 
     //VSYNC
     #define DCMI_VSYNC_GPIO_PORT              GPIOI
     #define DCMI_VSYNC_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOI_CLK_ENABLE()
-
     #define DCMI_VSYNC_GPIO_PIN               GPIO_PIN_5
-    #define DCMI_VSYNC_AF                 GPIO_AF13_DCMI
+    #define DCMI_VSYNC_AF                     GPIO_AF13_DCMI
     // HSYNC
     #define DCMI_HSYNC_GPIO_PORT              GPIOA
     #define DCMI_HSYNC_GPIO_CLK_ENABLE()        __HAL_RCC_GPIOA_CLK_ENABLE()
-
     #define DCMI_HSYNC_GPIO_PIN               GPIO_PIN_4
-    #define DCMI_HSYNC_AF                 GPIO_AF13_DCMI
+    #define DCMI_HSYNC_AF                     GPIO_AF13_DCMI
     //PIXCLK
     #define DCMI_PIXCLK_GPIO_PORT             GPIOA
     #define DCMI_PIXCLK_GPIO_CLK_ENABLE()       __HAL_RCC_GPIOA_CLK_ENABLE()
-
     #define DCMI_PIXCLK_GPIO_PIN              GPIO_PIN_6
-    #define DCMI_PIXCLK_AF                  GPIO_AF13_DCMI
+    #define DCMI_PIXCLK_AF                    GPIO_AF13_DCMI
     //PWDN
     #define DCMI_PWDN_GPIO_PORT                 GPIOG
     #define DCMI_PWDN_GPIO_CLK_ENABLE()         __HAL_RCC_GPIOG_CLK_ENABLE()
-
     #define DCMI_PWDN_GPIO_PIN                  GPIO_PIN_3
-
-    //RST
-    #define DCMI_RST_GPIO_PORT                  GPIOB
-    #define DCMI_RST_GPIO_CLK_ENABLE()          __HAL_RCC_GPIOB_CLK_ENABLE()
-
-    #define DCMI_RST_GPIO_PIN                   GPIO_PIN_5
 
     //数据信号线
     #define DCMI_D0_GPIO_PORT                 GPIOH
     #define DCMI_D0_GPIO_CLK_ENABLE()           __HAL_RCC_GPIOH_CLK_ENABLE()
-
     #define DCMI_D0_GPIO_PIN                  GPIO_PIN_9
-    #define DCMI_D0_AF                      GPIO_AF13_DCMI
-    /*....省略部分数据线*/
+    #define DCMI_D0_AF                        GPIO_AF13_DCMI 
+    /*....省略部分数据线*/ 
+
 
 以上代码根据硬件的连接，把与DCMI、I2C接口与摄像头通讯使用的引脚号、引脚源以及复用功能映射都以宏封装起来。
 
@@ -734,36 +779,44 @@ XCLK引脚引出至外部，由外部控制器提供时钟；标号处的是电�
 
 .. code-block:: c
    :name: 代码清单 46-0‑4 配置DCMI的模式(bsp_ov2640.c文件)
+   :caption: 代码清单 46-0‑4 配置DCMI的模式(bsp_ov2640.c文件)
 
-   /**
-   * @brief  配置 DCMI/DMA 以捕获摄像头数据
-   * @param  None
-   * @retval None
-   */
-   void OV5640_Init(void)
-   {
-      /*** 配置DCMI接口 ***/
-      /* 使能DCMI时钟 */
-      __HAL_RCC_DCMI_CLK_ENABLE();
+    /**
+    * @brief  配置 DCMI/DMA 以捕获摄像头数据
+    * @param  None
+    * @retval None
+    */
+    void OV5640_Init(void)
+    {
+        /*** 配置DCMI接口 ***/
+        /* 使能DCMI时钟 */
+        __HAL_RCC_DCMI_CLK_ENABLE();
 
-      /* DCMI 配置*/
-      DCMI_Handle.Instance              = DCMI;
-      DCMI_Handle.Init.SynchroMode      = DCMI_MODE_CONTINUOUS;
-      DCMI_Handle.Init.SynchroMode      = DCMI_SYNCHRO_HARDWARE;
-      DCMI_Handle.Init.PCKPolarity      = DCMI_PCKPOLARITY_RISING;
-      DCMI_Handle.Init.VSPolarity       = DCMI_VSPOLARITY_LOW;
-      DCMI_Handle.Init.HSPolarity       = DCMI_HSPOLARITY_LOW;
-      DCMI_Handle.Init.CaptureRate      = DCMI_CR_ALL_FRAME;
-      DCMI_Handle.Init.ExtendedDataMode = DCMI_EXTEND_DATA_8B;
-      HAL_DCMI_Init(&DCMI_Handle);
+        /* DCMI 配置*/
+        //DCMI外设寄存器基地址
+        DCMI_Handle.Instance              = DCMI;
+        //连续采集模式
+        DCMI_Handle.Init.SynchroMode      = DCMI_MODE_CONTINUOUS;
+        //连续采集模式
+        DCMI_Handle.Init.SynchroMode      = DCMI_SYNCHRO_HARDWARE;
+        //像素时钟上升沿有效
+        DCMI_Handle.Init.PCKPolarity      = DCMI_PCKPOLARITY_RISING;
+        //VSP高电平有效
+        DCMI_Handle.Init.VSPolarity       = DCMI_VSPOLARITY_HIGH;
+        //HSP低电平有效
+        DCMI_Handle.Init.HSPolarity       = DCMI_HSPOLARITY_LOW;
+        //全采集
+        DCMI_Handle.Init.CaptureRate      = DCMI_CR_ALL_FRAME;
+        //8位数据宽度
+        DCMI_Handle.Init.ExtendedDataMode = DCMI_EXTEND_DATA_8B;
+        HAL_DCMI_Init(&DCMI_Handle);
 
-      /* 配置中断 */
-      HAL_NVIC_SetPriority(DCMI_IRQn, 5, 0);
-      HAL_NVIC_EnableIRQ(DCMI_IRQn);
-
-      //开始传输，数据大小以32位数据为单位(即像素个数/4，LCD_GetXSize()*LCD_GetYSize()*2/4)
-      OV5640_DMA_Config(LCD_FB_START_ADDRESS,LCD_GetXSize()*LCD_GetYSize()/2);
-   }
+        /* 配置中断 */
+        HAL_NVIC_SetPriority(DCMI_IRQn, 0, 5);
+        HAL_NVIC_EnableIRQ(DCMI_IRQn);
+        //dma_memory 以16位数据为单位， dma_bufsize以32位数据为单位(即像素个数/2)
+        OV5640_DMA_Config(LCD_FB_START_ADDRESS,LCD_GetXSize()*LCD_GetYSize()/2);
+    }
 
 该函数的执行流程如下：
 
@@ -1138,12 +1191,17 @@ main函数
     int main(void)
     {
         OV5640_IDTypeDef OV5640_Camera_ID;
-        /* 系统时钟初始化成216 MHz */
+        /* 系统时钟初始化成400MHz */
         SystemClock_Config();
         /* LED 端口初始化 */
         LED_GPIO_Config();
-        /*初始化USART1*/
-        DEBUG_USART_Config();
+        /* 配置串口1为：115200 8-N-1 */
+        UARTx_Config();
+    
+        printf("\r\n 欢迎使用野火  STM32 H743 开发板。\r\n");
+        printf("\r\n野火STM32H743 LTDC液晶显示中文测试例程\r\n");
+        /*蓝灯亮，表示正在读写SDRAM测试*/
+        //LED_BLUE;
         /* LCD 端口初始化 */
         LCD_Init();
         /* LCD 第一层初始化 */
@@ -1152,37 +1210,38 @@ main函数
         LCD_LayerInit(1, LCD_FB_START_ADDRESS+(LCD_GetXSize()*LCD_GetYSize()*4),ARGB8888);
         /* 使能LCD，包括开背光 */
         LCD_DisplayOn();
-
+    
         /* 选择LCD第一层 */
         LCD_SelectLayer(0);
-
-        /* 第一层清屏，显示蓝色 */
+    
+        /* 第一层清屏，显示全蓝色 */
         LCD_Clear(LCD_COLOR_BLUE);
-
+    
         /* 选择LCD第二层 */
         LCD_SelectLayer(1);
-        /* 第二层清屏，显示全黑 */
+    
+        /* 第二层清屏，显示透明 */
         LCD_Clear(TRANSPARENCY);
-        /* 配置第一和第二层的透明度,最小值为0，最大值为255*/
+    
+        /* 配置第一和第二层的透明度,0位完全透明，255为完全不透明*/
         LCD_SetTransparency(0, 255);
         LCD_SetTransparency(1, 255);
-
+    
         LCD_SetColors(LCD_COLOR_WHITE,TRANSPARENCY);
         LCD_DisplayStringLine_EN_CH(1,(uint8_t* )" 模式:UXGA 800x480");
         CAMERA_DEBUG("STM32H743 DCMI 驱动OV5640例程");
-
+    
         OV5640_HW_Init();
         //初始化 I2C
         I2CMaster_Init();
-
         /* 读取摄像头芯片ID，确定摄像头正常连接 */
         OV5640_ReadID(&OV5640_Camera_ID);
-
+    
         if (OV5640_Camera_ID.PIDH  == 0x56) {
             CAMERA_DEBUG("%x%x",OV5640_Camera_ID.PIDH ,OV5640_Camera_ID.PIDL);
         } else {
             LCD_SetColors(LCD_COLOR_WHITE,TRANSPARENCY);
-        LCD_DisplayStringLine_EN_CH(8,(uint8_t*) "         没有检测到OV5640，请重新检查连接。");
+            LCD_DisplayStringLine_EN_CH(8,(uint8_t*) "没有检测到OV5640，请重新检查连接。");
             CAMERA_DEBUG("没有检测到OV5640摄像头，请重新检查连接。");
             while (1);
         }
@@ -1190,11 +1249,12 @@ main函数
         OV5640_RGB565Config();
         /* 初始化摄像头，捕获并显示图像 */
         OV5640_Init();
+        //刷OV5640的自动对焦固件
         OV5640_AUTO_FOCUS();
         //重置
         fps =0;
         Task_Delay[0]=1000;
-
+    
         while (1) {
             if (Task_Delay[0]==0) {
                 LCD_SelectLayer(1);
@@ -1205,9 +1265,8 @@ main函数
                 LCD_DisplayStringLine_EN_CH(2,dispBuf);
                 //重置
                 fps =0;
-
                 Task_Delay[0]=1000; //此值每1ms会减1，减到0才可以重新进来这里
-
+    
             }
         }
     }
